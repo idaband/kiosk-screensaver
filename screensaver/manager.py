@@ -31,6 +31,7 @@ class ScreensaverManager:
         self.running = False
         self.inotify = None
         self.current_mode = None  # Track current mode: 'day' or 'night'
+        self.startup_time = time.time()  # Track when screensaver process started
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -157,6 +158,15 @@ class ScreensaverManager:
             return
 
         logger.info("Idle timeout detected")
+
+        # Boot grace period: Don't activate screensaver during first 90 seconds after startup
+        # This gives Wayland compositor time to fully initialize and prevents half-screen bug
+        boot_grace_period = self.config.get('timing', 'boot_grace_period', default=90)
+        time_since_startup = time.time() - self.startup_time
+        if time_since_startup < boot_grace_period:
+            logger.info(f"Within boot grace period ({int(time_since_startup)}s/{boot_grace_period}s) - resetting idle timer")
+            self.last_activity_time = time.time()
+            return
 
         # Check Home Assistant state as go/no-go gate
         # If HA says disabled, reset idle timer and try again next cycle

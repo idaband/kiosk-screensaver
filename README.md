@@ -173,6 +173,9 @@ photo_source_path: /mnt/photos
 
 ### Normal Operation
 
+- **Boot**: After system startup, screensaver waits 90 seconds before it can activate (boot grace period)
+  - This ensures the Wayland compositor is fully initialized
+  - Prevents display issues on fresh boot
 - **Idle**: After configured timeout (default 20 seconds), slideshow starts
 - **Wake**: Tap screen or move mouse to return to dashboard
 - **Day mode** (6:15 AM - 11:00 PM): Photo slideshow
@@ -272,6 +275,16 @@ After editing, restart services:
 sudo systemctl restart screensaver-web
 pkill -f screensaver.main  # Will auto-restart from autostart
 ```
+
+### Boot Grace Period
+
+The `boot_grace_period` setting (default: 90 seconds) prevents the screensaver from activating immediately after system boot. This is critical for proper operation:
+
+- Wayland compositor (labwc) needs time to fully initialize after boot
+- Without this delay, the screensaver may launch Chromium windows before the compositor is ready
+- This can cause display issues like half-screen rendering
+- **Recommended minimum: 60 seconds** for Raspberry Pi 5
+- Do not disable this setting (set to 0) unless you're using systemd service startup with proper dependencies
 
 ### Scheduled Reboots
 

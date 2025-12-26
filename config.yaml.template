@@ -6,6 +6,11 @@ timing:
   # Seconds of inactivity before screensaver activates
   idle_timeout: 20
 
+  # Boot grace period (seconds) - prevents screensaver activation after startup
+  # This allows the Wayland compositor to fully initialize before screensaver can activate
+  # Prevents half-screen bug on boot. Do not set below 60 seconds.
+  boot_grace_period: 90
+
   # Seconds between photo changes in slideshow
   slideshow_interval: 300
 
