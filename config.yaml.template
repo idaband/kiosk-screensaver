@@ -1,0 +1,140 @@
+# Kiosk Screensaver Configuration
+# This file controls all aspects of the screensaver system
+
+# ==================== TIMING PARAMETERS ====================
+timing:
+  # Seconds of inactivity before screensaver activates
+  idle_timeout: 20
+
+  # Seconds between photo changes in slideshow
+  slideshow_interval: 300
+
+  # Daytime mode times (24-hour format HHMM)
+  # When time is between these times: photo slideshow
+  # Outside these times: blank screen + monitor off
+  # Example: 0615-2300 means slideshow from 6:15 AM to 11:00 PM
+  #          blank screen from 11:01 PM to 6:14 AM
+  day_mode_start_time: "0615"
+  night_mode_start_time: "2300"
+
+  # Image load timeout in milliseconds
+  image_load_timeout_ms: 30000
+
+# ==================== NETWORK PARAMETERS ====================
+network:
+  # HTTP server ports
+  rclone_port: 8090
+  python_port: 8091
+  web_admin_port: 5000
+
+  # Bind addresses
+  rclone_host: 127.0.0.1
+  python_host: 127.0.0.1
+  web_admin_host: 0.0.0.0  # Listen on all interfaces for admin panel
+
+  # Photo source path (will be set during installation)
+  photo_source_path: __PHOTO_PATH__
+
+  # Home Assistant integration (will be set during installation)
+  home_assistant:
+    enabled: __HA_ENABLED__
+    url: __HA_URL__
+    entity: input_boolean.disable_screensaver
+    token_file: ~/.ha_token
+    api_timeout: 5
+    # Fail-safe: if HA unavailable, should screensaver activate?
+    fail_safe_enable: true
+
+# ==================== DISPLAY PARAMETERS ====================
+display:
+  # Brightness levels (0-100)
+  dimmed_brightness: 0
+  normal_brightness: 80
+
+  # Main kiosk dashboard URL (will be set during installation)
+  dashboard_url: __DASHBOARD_URL__
+
+  # Monitor power management
+  night_mode_monitor_off: true
+
+# ==================== FILE PATHS ====================
+paths:
+  # Chromium profile directories
+  chromium_slideshow_profile: /tmp/chromium-slideshow
+  chromium_night_profile: /tmp/chromium-screensaver-night
+
+  # Data files
+  photo_list_json: ~/photo-list.json
+  log_file: /var/log/kiosk-screensaver.log
+
+  # HTML templates (will be set during installation)
+  slideshow_html: __INSTALL_DIR__/static/slideshow.html
+  screensaver_html: __INSTALL_DIR__/static/screensaver.html
+
+# ==================== FEATURE FLAGS ====================
+features:
+  # Privacy mode: use blank screen instead of photo slideshow during day
+  privacy_mode: false
+
+  # Auto-regenerate photo list
+  auto_regenerate_photos: true
+  regenerate_schedule:
+    day_of_week: "*"  # 0=Monday, 6=Sunday, or * for daily
+    time: "02:00"  # 24-hour format HH:MM
+
+  # Web admin panel
+  web_admin_enabled: true
+  web_admin_auth: false  # Set to true to require password
+  web_admin_password: ""  # Only used if web_admin_auth is true
+
+  # Scheduled system reboot for maintenance
+  scheduled_reboot:
+    enabled: false
+    frequency: "weekly"  # "daily" or "weekly"
+    day_of_week: 1  # 0=Monday, 6=Sunday (only used if frequency is "weekly")
+    reboot_time: "0300"  # 24-hour format HHMM
+
+# ==================== PHOTO PARAMETERS ====================
+photos:
+  # Maximum photo file size in MB (larger files excluded)
+  max_size_mb: 10
+
+  # Supported file extensions
+  extensions:
+    - jpg
+    - jpeg
+    - png
+    - gif
+
+  # Preloading (future enhancement)
+  preload_next: false
+
+# ==================== LOGGING ====================
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  max_size_mb: 10
+  backup_count: 3
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# ==================== CHROMIUM FLAGS ====================
+chromium:
+  # Hardware acceleration
+  hardware_acceleration: true
+
+  # Additional flags for performance
+  extra_flags:
+    - --use-gl=egl
+    - --enable-features=VaapiVideoDecoder,VaapiVideoEncoder
+    - --ignore-gpu-blocklist
+    - --enable-gpu-rasterization
+    - --enable-zero-copy
+
+  # Dark mode flags (prevent white flash)
+  dark_mode_flags:
+    - --force-dark-mode
+    - --enable-features=WebUIDarkMode
+
+# ==================== ENVIRONMENT ====================
+environment:
+  wayland_display: wayland-0
+  libva_driver: v3d_video

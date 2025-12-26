@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: black; overflow: hidden; cursor: none; font-family: Arial, sans-serif; }
+        .slideshow-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: black; }
+        .slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1s ease-in-out; display: flex; align-items: center; justify-content: center; }
+        .slide.active { opacity: 1; }
+        .slide img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 24px; }
+    </style>
+</head>
+<body onclick="window.close()">
+    <div class="slideshow-container">
+        <div class="slide" id="slide1"></div>
+        <div class="slide" id="slide2"></div>
+    </div>
+    <div class="loading" id="loading">Loading photos...</div>
+
+    <script>
+        let photos = [];
+        let currentSlide = 0;
+        let lastPhotoIndex = -1;
+        let isLoading = false;
+        let countdown = 0;
+        let INTERVAL = 300;  // Default, will be loaded from config
+
+        async function init() {
+            try {
+                // Load slideshow interval from static config file (served by same HTTP server as photos)
+                try {
+                    const configResponse = await fetch('http://127.0.0.1:8091/slideshow-config.json');
+                    const configData = await configResponse.json();
+                    INTERVAL = configData.slideshow_interval || 300;
+                    console.log('Loaded slideshow interval:', INTERVAL);
+                } catch (configError) {
+                    console.error('Failed to load slideshow config, using default interval:', configError);
+                }
+
+                // Load photo list
+                const response = await fetch('http://127.0.0.1:8091/photo-list.json');
+                const data = await response.json();
+                photos = data.photos;
+
+                if (photos.length > 0) {
+                    document.getElementById('loading').style.display = 'none';
+                    await showPhoto();
+                    countdown = INTERVAL;
+                    setInterval(tick, 1000);
+                } else {
+                    document.getElementById('loading').textContent = 'No photos found';
+                }
+            } catch (error) {
+                document.getElementById('loading').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function tick() {
+            countdown--;
+            if (countdown <= 0) {
+                countdown = INTERVAL;
+                showPhoto();
+            }
+        }
+
+        function getRandomIndex() {
+            if (photos.length <= 1) return 0;
+            let index;
+            let tries = 0;
+            do {
+                index = Math.floor(Math.random() * photos.length);
+                tries++;
+            } while (index === lastPhotoIndex && tries < 10);
+            return index;
+        }
+
+        async function showPhoto() {
+            if (isLoading) return;
+            isLoading = true;
+
+            const index = getRandomIndex();
+            lastPhotoIndex = index;
+            const url = photos[index];
+
+            try {
+                const img = await loadWithTimeout(url, 30000);
+
+                const nextSlideNum = currentSlide === 0 ? 1 : 0;
+                const currentEl = document.getElementById('slide' + (currentSlide + 1));
+                const nextEl = document.getElementById('slide' + (nextSlideNum + 1));
+
+                nextEl.innerHTML = '';
+                nextEl.appendChild(img);
+                nextEl.classList.add('active');
+                currentEl.classList.remove('active');
+
+                setTimeout(function() { currentEl.innerHTML = ''; }, 1500);
+                currentSlide = nextSlideNum;
+            } catch (e) {
+                console.error('Load error:', e.message);
+            }
+
+            isLoading = false;
+        }
+
+        function loadWithTimeout(url, ms) {
+            return new Promise(function(resolve, reject) {
+                const img = new Image();
+                const timeout = setTimeout(function() {
+                    reject(new Error('Timeout'));
+                }, ms);
+
+                img.onload = function() {
+                    clearTimeout(timeout);
+                    resolve(img);
+                };
+
+                img.onerror = function() {
+                    clearTimeout(timeout);
+                    reject(new Error('Load failed'));
+                };
+
+                img.src = url;
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>

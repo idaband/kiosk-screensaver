@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Generated files
+photo-list.json
+*.log
+
+# Secrets
+.ha_token
+*.token
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+.claude/
+
+# Backup
+screensaver-backup-*/
+
+# Project documentation with personal examples
+context.txt
