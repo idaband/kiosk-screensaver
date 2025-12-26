@@ -1,5 +1,7 @@
 # Kiosk Screensaver System
 
+> **Author's Note:** This project was created to solve a very specific need - a fast-responding slideshow screensaver for a Raspberry Pi 5 running a Home Assistant dashboard in kiosk mode. I developed this system using Visual Studio Code with significant assistance from the Claude Code extension. My personal coding ability is quite limited, and this project wouldn't have been possible without AI assistance. I'm sharing it publicly in case others have similar needs, but please be aware of its origins when using or contributing.
+
 A comprehensive, configurable screensaver system for Raspberry Pi 5 kiosk displays with Home Assistant integration.
 
 Perfect for creating a wall-mounted Home Assistant dashboard that automatically shows a photo slideshow when idle.
