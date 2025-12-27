@@ -16,8 +16,17 @@ pkill -f chromium.*screensaver.html 2>/dev/null || true
 # 2. Remove screensaver from labwc autostart
 echo "[2/5] Removing screensaver from autostart..."
 if [ -f ~/.config/labwc/autostart ]; then
+    # Remove all kiosk-screensaver related entries
+    sed -i '/# Disable D-Bus keyring/d' ~/.config/labwc/autostart
+    sed -i '/DBUS_SESSION_BUS_ADDRESS/d' ~/.config/labwc/autostart
+    sed -i '/# Hide mouse cursor/d' ~/.config/labwc/autostart
+    sed -i '/unclutter -idle/d' ~/.config/labwc/autostart
+    sed -i '/# Home Assistant Dashboard/d' ~/.config/labwc/autostart
+    sed -i '/chromium.*--kiosk/d' ~/.config/labwc/autostart
     sed -i '/# Kiosk Screensaver/d' ~/.config/labwc/autostart
     sed -i '/screensaver.main/d' ~/.config/labwc/autostart
+    # Remove empty lines
+    sed -i '/^$/N;/^\n$/d' ~/.config/labwc/autostart
     echo "✓ Screensaver entries removed from autostart"
 else
     echo "  No autostart file found"
