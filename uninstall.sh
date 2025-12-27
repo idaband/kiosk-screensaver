@@ -7,40 +7,35 @@ echo "Screensaver Safe Uninstall"
 echo "=========================================="
 echo ""
 
-# 1. Stop and disable screensaver services
-echo "[1/7] Stopping screensaver services..."
-sudo systemctl stop screensaver.service 2>/dev/null || true
-sudo systemctl stop screensaver-web.service 2>/dev/null || true
-sudo systemctl disable screensaver.service 2>/dev/null || true
-sudo systemctl disable screensaver-web.service 2>/dev/null || true
-
-# 2. Remove only screensaver service files
-echo "[2/7] Removing screensaver service files..."
-sudo rm -f /etc/systemd/system/screensaver.service
-sudo rm -f /etc/systemd/system/screensaver-web.service
-sudo systemctl daemon-reload
-
-# 3. Remove screensaver sudoers file
-echo "[3/7] Removing screensaver sudoers configuration..."
-sudo rm -f /etc/sudoers.d/kiosk-screensaver
-
-# 4. Kill screensaver processes only (not dashboard chromium)
-echo "[4/7] Stopping screensaver processes..."
+# 1. Kill screensaver processes (not dashboard chromium)
+echo "[1/5] Stopping screensaver processes..."
 pkill -f screensaver.main 2>/dev/null || true
 pkill -f chromium.*slideshow.html 2>/dev/null || true
 pkill -f chromium.*screensaver.html 2>/dev/null || true
 
-# 5. Remove screensaver installation directory
-echo "[5/7] Removing screensaver installation..."
+# 2. Remove screensaver from labwc autostart
+echo "[2/5] Removing screensaver from autostart..."
+if [ -f ~/.config/labwc/autostart ]; then
+    sed -i '/# Kiosk Screensaver/d' ~/.config/labwc/autostart
+    sed -i '/screensaver.main/d' ~/.config/labwc/autostart
+    echo "✓ Screensaver entries removed from autostart"
+else
+    echo "  No autostart file found"
+fi
+
+# 3. Remove screensaver installation directory
+echo "[3/5] Removing screensaver installation..."
 rm -rf ~/kiosk-screensaver
 
-# 6. Remove screensaver data files (not user config)
-echo "[6/7] Removing screensaver data files..."
+# 4. Remove screensaver data files
+echo "[4/5] Removing screensaver data files..."
 rm -f ~/photo-list.json
 rm -f ~/.ha_token
+rm -f ~/kiosk-screensaver.log
+rm -f ~/screensaver-startup.log
 
-# 7. Clean up screensaver temp directories
-echo "[7/7] Cleaning temporary files..."
+# 5. Clean up screensaver temp directories
+echo "[5/5] Cleaning temporary files..."
 rm -rf /tmp/chromium-slideshow
 rm -rf /tmp/chromium-screensaver-night
 
