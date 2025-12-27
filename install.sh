@@ -385,7 +385,7 @@ cat >> "$AUTOSTART_FILE" <<EOF
 chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --check-for-update-interval=31536000 --password-store=basic --disable-features=WakeLockSensor,IdleDetection,MediaSession --use-gl=egl --enable-features=VaapiVideoDecoder,VaapiVideoEncoder --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy --ignore-certificate-errors $DASHBOARD_URL &
 
 # Kiosk Screensaver (Python version)
-cd $INSTALL_DIR && python3 -m screensaver.main -c $INSTALL_DIR/config.yaml &
+cd $INSTALL_DIR && PYTHONPATH=$INSTALL_DIR python3 -m screensaver.main -c $INSTALL_DIR/config.yaml &
 EOF
 
 echo "✓ labwc autostart configured"
