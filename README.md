@@ -146,14 +146,16 @@ If enabled during install:
 
 Configure your photo source path during installation or edit later in `config.yaml`.
 
+**Important:** If using network shares or external drives, you are responsible for mounting them properly on your Raspberry Pi. The examples below show the basic commands, but configuring persistent mounts, credentials, and network stability is outside the scope of this project. Refer to Raspberry Pi and Linux documentation for mounting network shares.
+
 **Local photos:**
 ```bash
 photo_source_path: /home/username/Pictures
 ```
 
-**Network share (Windows/Samba):**
+**Network share (Windows/Samba) - Example:**
 ```bash
-# First, mount the share (add to /etc/fstab for auto-mount)
+# First, mount the share (add to /etc/fstab for auto-mount on boot)
 sudo mkdir /mnt/photos
 sudo mount -t cifs //192.168.1.100/Pictures /mnt/photos -o username=user,password=pass
 
@@ -161,13 +163,15 @@ sudo mount -t cifs //192.168.1.100/Pictures /mnt/photos -o username=user,passwor
 photo_source_path: /mnt/photos
 ```
 
-**NFS share:**
+**NFS share - Example:**
 ```bash
 sudo mkdir /mnt/photos
 sudo mount -t nfs 192.168.1.100:/photos /mnt/photos
 
 photo_source_path: /mnt/photos
 ```
+
+**Note:** Network share mounting configuration, credentials management, and ensuring mounts persist across reboots are the user's responsibility. Search for "Raspberry Pi mount network share" or "Linux fstab configuration" for detailed guides.
 
 ## Usage
 
