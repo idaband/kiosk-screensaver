@@ -391,6 +391,24 @@ EOF
 echo "✓ labwc autostart configured"
 echo "  Dashboard will launch first, then screensaver"
 
+# Configure labwc to start on login (tty1 only)
+echo
+echo "Configuring labwc to start on login..."
+
+# Check if already configured
+if grep -q "exec labwc" "$USER_HOME/.bash_profile" 2>/dev/null; then
+    echo "✓ labwc auto-start already configured in .bash_profile"
+else
+    cat >> "$USER_HOME/.bash_profile" <<'EOF'
+
+# Start labwc Wayland compositor on login (tty1 only)
+if [ -z "$WAYLAND_DISPLAY" ] && [ "$XDG_VTNR" = "1" ]; then
+  exec labwc
+fi
+EOF
+    echo "✓ labwc will auto-start on console login"
+fi
+
 # ==============================================================================
 # STEP 10: Enable and start web admin service
 # ==============================================================================
