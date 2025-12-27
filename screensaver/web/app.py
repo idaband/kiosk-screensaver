@@ -187,6 +187,28 @@ def create_app(config_path=None):
                 if not success:
                     logger.warning(f"Failed to update reboot cron: {message}")
 
+            # Update labwc autostart if dashboard URL changed
+            if 'display' in updates and 'dashboard_url' in updates['display']:
+                new_url = updates['display']['dashboard_url']
+                autostart_file = os.path.expanduser('~/.config/labwc/autostart')
+                if os.path.exists(autostart_file):
+                    try:
+                        with open(autostart_file, 'r') as f:
+                            content = f.read()
+
+                        # Replace the dashboard URL in the chromium command
+                        import re
+                        pattern = r'(chromium.*--ignore-certificate-errors\s+)https?://[^\s&]+(\s+&)'
+                        replacement = r'\1' + new_url + r'\2'
+                        new_content = re.sub(pattern, replacement, content)
+
+                        with open(autostart_file, 'w') as f:
+                            f.write(new_content)
+
+                        logger.info(f"Updated dashboard URL in autostart to: {new_url}")
+                    except Exception as e:
+                        logger.error(f"Failed to update autostart file: {e}")
+
             # Write slideshow config for static HTTP server
             try:
                 config_path = config.config_path

@@ -302,6 +302,11 @@
         </div>
 
         <h2>🖼️ Display Settings</h2>
+        <div class="form-group">
+            <label for="dashboardUrl">Dashboard URL</label>
+            <input type="text" id="dashboardUrl" placeholder="https://192.168.1.100:8123">
+            <div class="help-text">URL for the main kiosk dashboard (shown in Chromium when not in screensaver mode)</div>
+        </div>
         <div class="grid">
             <div class="form-group">
                 <label for="dimmedBrightness">Dimmed Brightness (0-100)</label>
@@ -416,6 +421,7 @@
                 document.getElementById('nightStart').value = config.timing.night_mode_start_time || '2300';
 
                 // Display
+                document.getElementById('dashboardUrl').value = config.display.dashboard_url || '';
                 document.getElementById('dimmedBrightness').value = config.display.dimmed_brightness;
                 document.getElementById('normalBrightness').value = config.display.normal_brightness;
 
@@ -519,6 +525,7 @@
                         night_mode_start_time: nightStart
                     },
                     display: {
+                        dashboard_url: document.getElementById('dashboardUrl').value,
                         dimmed_brightness: parseInt(document.getElementById('dimmedBrightness').value),
                         normal_brightness: parseInt(document.getElementById('normalBrightness').value),
                         night_mode_monitor_off: document.getElementById('nightMonitorOff').checked
