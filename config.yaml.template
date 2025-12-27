@@ -70,7 +70,7 @@ paths:
 
   # Data files
   photo_list_json: ~/photo-list.json
-  log_file: /var/log/kiosk-screensaver.log
+  log_file: ~/kiosk-screensaver.log
 
   # HTML templates (will be set during installation)
   slideshow_html: __INSTALL_DIR__/static/slideshow.html
