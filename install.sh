@@ -389,7 +389,7 @@ export DBUS_SESSION_BUS_ADDRESS=/dev/null
 unclutter -idle 2 -root &
 
 # Home Assistant Dashboard (Chromium Kiosk Mode with dark mode)
-chromium --password-store=basic --use-mock-keychain --no-default-browser-check --kiosk --noerrdialogs --disable-infobars --no-first-run --check-for-update-interval=31536000 --disable-sync --disable-features=WakeLockSensor,IdleDetection,MediaSession,PasswordManager,PasswordManagerOnboarding --use-gl=egl --enable-features=VaapiVideoDecoder,VaapiVideoEncoder,WebUIDarkMode --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy --force-dark-mode --ignore-certificate-errors $DASHBOARD_URL &
+chromium --password-store=basic --use-mock-keychain --no-default-browser-check --kiosk --noerrdialogs --disable-infobars --no-first-run --check-for-update-interval=31536000 --disable-sync --disable-features=WakeLockSensor,IdleDetection,MediaSession,PasswordManager,PasswordManagerOnboarding --enable-features=VaapiVideoDecoder,VaapiVideoEncoder,WebUIDarkMode --force-dark-mode --ignore-certificate-errors $DASHBOARD_URL &
 
 # Kiosk Screensaver (Python version) - log startup to file for debugging
 cd $INSTALL_DIR && PYTHONPATH=$INSTALL_DIR python3 -m screensaver.main -c $INSTALL_DIR/config.yaml >> $USER_HOME/screensaver-startup.log 2>&1 &
