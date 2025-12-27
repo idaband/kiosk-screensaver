@@ -417,11 +417,35 @@ EOF
 fi
 
 # ==============================================================================
-# STEP 10: Enable and start web admin service
+# STEP 10: Generate initial photo list
 # ==============================================================================
 echo
 echo "========================================================"
-echo "STEP 10/10: Configuring Web Admin Service"
+echo "STEP 10/11: Generating Initial Photo List"
+echo "========================================================"
+
+if [ -d "$PHOTO_PATH" ]; then
+    echo "Scanning photo directory and generating photo list..."
+    cd "$INSTALL_DIR" && PYTHONPATH="$INSTALL_DIR" python3 -m screensaver.photo_manager "$CONFIG_FILE" 2>/dev/null && {
+        PHOTO_COUNT=$(python3 -c "import json; print(len(json.load(open('$USER_HOME/photo-list.json'))))" 2>/dev/null || echo "unknown")
+        echo "✓ Photo list generated successfully"
+        echo "  Found $PHOTO_COUNT photos"
+    } || {
+        echo "⚠ Failed to generate photo list"
+        echo "  This is normal if photos haven't been mounted yet"
+        echo "  The screensaver will generate it on first run"
+    }
+else
+    echo "⚠ Photo directory not accessible: $PHOTO_PATH"
+    echo "  Photo list will be generated when directory becomes available"
+fi
+
+# ==============================================================================
+# STEP 11: Enable and start web admin service
+# ==============================================================================
+echo
+echo "========================================================"
+echo "STEP 11/11: Configuring Web Admin Service"
 echo "========================================================"
 
 sudo systemctl enable screensaver-web.service 2>/dev/null && {
@@ -457,6 +481,13 @@ echo "  - Home Assistant: $HA_URL"
 fi
 echo "  - Photo path: $PHOTO_PATH"
 echo "  - Install directory: $INSTALL_DIR"
+echo
+WEB_PORT=$(grep "web_admin_port:" "$CONFIG_FILE" | awk '{print $2}')
+WEB_PORT=${WEB_PORT:-5000}
+PI_IP=$(hostname -I | awk '{print $1}')
+echo "WEB ADMIN PANEL:"
+echo "  http://$PI_IP:$WEB_PORT"
+echo "  (Bookmark this URL for easy access to screensaver settings)"
 echo
 echo "NEXT STEPS:"
 echo
