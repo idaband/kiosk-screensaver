@@ -177,6 +177,9 @@ else
     HA_ENABLED="true"
     echo "Enter your Home Assistant URL (including https:// and port)"
     echo "Example: https://192.168.1.100:8123"
+    echo
+    echo "IMPORTANT: Use your LOCAL network IP address, NOT DuckDNS or external URL"
+    echo "The screensaver runs on the same local network as Home Assistant"
     read -p "HA URL: " HA_URL
     echo "✓ Home Assistant URL: $HA_URL"
 fi
@@ -188,6 +191,9 @@ echo
 echo "Enter your kiosk dashboard URL (this will open in Chromium kiosk mode)"
 echo "This can be the same as your Home Assistant URL, or a different dashboard"
 echo "Example: https://192.168.1.100:8123"
+echo
+echo "IMPORTANT: Use your LOCAL network IP address, NOT DuckDNS or external URL"
+echo "External URLs may cause connectivity issues or slow loading"
 read -p "Dashboard URL: " DASHBOARD_URL
 echo "✓ Dashboard URL: $DASHBOARD_URL"
 
@@ -376,7 +382,7 @@ fi
 cat >> "$AUTOSTART_FILE" <<EOF
 
 # Home Assistant Dashboard (Chromium Kiosk Mode)
-chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --check-for-update-interval=31536000 --password-store=basic --disable-features=WakeLockSensor,IdleDetection,MediaSession --use-gl=egl --enable-features=VaapiVideoDecoder,VaapiVideoEncoder --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy $DASHBOARD_URL &
+chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --check-for-update-interval=31536000 --password-store=basic --disable-features=WakeLockSensor,IdleDetection,MediaSession --use-gl=egl --enable-features=VaapiVideoDecoder,VaapiVideoEncoder --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy --ignore-certificate-errors $DASHBOARD_URL &
 
 # Kiosk Screensaver (Python version)
 cd $INSTALL_DIR && python3 -m screensaver.main -c $INSTALL_DIR/config.yaml &

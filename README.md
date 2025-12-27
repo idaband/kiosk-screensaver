@@ -118,6 +118,8 @@ Configure:
 
 If enabled during install:
 
+**IMPORTANT:** Use your Home Assistant's **local network IP address** (e.g., `https://192.168.1.100:8123`), NOT your DuckDNS or external URL. The screensaver runs on the same local network as Home Assistant and should communicate locally for best performance and reliability.
+
 1. Create an `input_boolean` in Home Assistant:
    ```yaml
    input_boolean:
