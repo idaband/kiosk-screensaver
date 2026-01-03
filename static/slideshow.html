@@ -26,6 +26,7 @@
         let isLoading = false;
         let countdown = 0;
         let INTERVAL = 300;  // Default, will be loaded from config
+        let imageCache = {};  // Cache for preloaded images
 
         async function init() {
             try {
@@ -46,7 +47,13 @@
 
                 if (photos.length > 0) {
                     document.getElementById('loading').style.display = 'none';
+
+                    // Show first photo immediately
                     await showPhoto();
+
+                    // Preload next 4 photos in background for smooth transitions
+                    preloadNextPhotos(4);
+
                     countdown = INTERVAL;
                     setInterval(tick, 1000);
                 } else {
@@ -54,6 +61,25 @@
                 }
             } catch (error) {
                 document.getElementById('loading').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        function preloadNextPhotos(count) {
+            // Preload next few photos in background to cache them
+            for (let i = 0; i < count && i < photos.length; i++) {
+                const index = getRandomIndex();
+                const url = photos[index];
+                if (!imageCache[url]) {
+                    const img = new Image();
+                    img.onload = function() {
+                        imageCache[url] = img;
+                        console.log('Preloaded:', url);
+                    };
+                    img.onerror = function() {
+                        console.error('Preload failed:', url);
+                    };
+                    img.src = url;
+                }
             }
         }
 
@@ -85,7 +111,14 @@
             const url = photos[index];
 
             try {
-                const img = await loadWithTimeout(url, 30000);
+                // Use cached image if available, otherwise load it
+                let img;
+                if (imageCache[url]) {
+                    console.log('Using cached image:', url);
+                    img = imageCache[url].cloneNode();
+                } else {
+                    img = await loadWithTimeout(url, 30000);
+                }
 
                 const nextSlideNum = currentSlide === 0 ? 1 : 0;
                 const currentEl = document.getElementById('slide' + (currentSlide + 1));
@@ -98,6 +131,9 @@
 
                 setTimeout(function() { currentEl.innerHTML = ''; }, 1500);
                 currentSlide = nextSlideNum;
+
+                // Preload more photos to keep cache fresh
+                preloadNextPhotos(2);
             } catch (e) {
                 console.error('Load error:', e.message);
             }
