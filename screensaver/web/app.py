@@ -189,7 +189,7 @@ def create_app(config_path=None):
 
             # Update labwc autostart if dashboard URL changed
             if 'display' in updates and 'dashboard_url' in updates['display']:
-                new_url = updates['display']['dashboard_url']
+                new_url = updates['display']['dashboard_url'].strip()
                 autostart_file = os.path.expanduser('~/.config/labwc/autostart')
                 if os.path.exists(autostart_file):
                     try:
@@ -197,9 +197,10 @@ def create_app(config_path=None):
                             content = f.read()
 
                         # Replace the dashboard URL in the chromium command
+                        # Pattern matches any URL (valid or malformed) after --ignore-certificate-errors
                         import re
-                        pattern = r'(chromium.*--ignore-certificate-errors\s+)https?://[^\s&]+(\s+&)'
-                        replacement = r'\1' + new_url + r'\2'
+                        pattern = r'(chromium.*--ignore-certificate-errors\s+)([^\s&]+)(\s+&)'
+                        replacement = r'\1' + new_url + r'\3'
                         new_content = re.sub(pattern, replacement, content)
 
                         with open(autostart_file, 'w') as f:

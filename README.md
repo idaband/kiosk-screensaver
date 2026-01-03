@@ -6,6 +6,8 @@ A comprehensive, configurable screensaver system for Raspberry Pi 5 kiosk displa
 
 Perfect for creating a wall-mounted Home Assistant dashboard that automatically shows a photo slideshow when idle.
 
+**Optimized for Raspberry Pi 5** with automatic Chromium version management and memory leak prevention for long-term stability.
+
 ## Features
 
 - **Automatic Idle Detection**: Monitors keyboard, mouse, and touchscreen input
@@ -17,6 +19,8 @@ Perfect for creating a wall-mounted Home Assistant dashboard that automatically 
 - **Privacy Mode**: Optional blank screen instead of photos
 - **Scheduled Reboots**: Automatic system maintenance reboots
 - **Movie Mode**: Quick script to force dark mode for watching movies
+- **Automatic Chromium Downgrade**: Installer automatically rolls back to stable Chromium 142 for reliability
+- **Memory Leak Prevention**: Process management prevents Chromium memory accumulation over extended runtime
 
 ## System Requirements
 
@@ -80,14 +84,15 @@ bash install.sh
 
 The installer will:
 1. Install all required dependencies (labwc, chromium, ddcutil, etc.)
-2. Ask for your configuration:
+2. **Downgrade Chromium to stable version 142** (version 143+ has stability issues on Pi 5)
+3. Ask for your configuration:
    - Home Assistant URL (optional)
    - Dashboard URL (required)
    - Photos folder path
-3. Switch boot mode from Desktop to CLI
-4. Configure auto-start for labwc, Chromium, and screensaver
-5. Set up web admin panel
-6. Configure permissions
+4. Switch boot mode from Desktop to CLI
+5. Configure auto-start for labwc, Chromium, and screensaver
+6. Set up web admin panel
+7. Configure permissions
 
 ### 5. Reboot
 
@@ -212,7 +217,57 @@ bash ~/kiosk-screensaver/force-night-screensaver.sh
 **Automation Alternative:**
 Instead of using this script, you can use the Home Assistant integration to disable the screensaver remotely via an HA automation or dashboard button.
 
+## Known Limitations
+
+### Raspberry Pi 5 Hardware Video Decode
+
+The Raspberry Pi 5 has **limited hardware video decode** capabilities:
+
+- **H.265/HEVC**: Hardware decode available via `/dev/video19` (rpi-hevc-dec)
+- **H.264**: **NO hardware decode** - uses software decoding only
+- **VP9/VP8**: Software decode only
+
+**Impact on Dashboard Performance:**
+- If your Home Assistant cameras stream H.264 (most common), expect ~15-20% CPU usage per video stream for software decode
+- This is normal and expected behavior on Raspberry Pi 5
+- To reduce CPU usage, consider:
+  - Converting camera streams to H.265/HEVC (requires camera support)
+  - Reducing video resolution or frame rate in Home Assistant
+  - Limiting the number of simultaneous video streams on dashboard
+
+**WebGL Rendering:**
+- WebGL content (like Windy weather radar) uses SwiftShader software rendering
+- Can use 50-95% GPU process CPU depending on complexity
+- No hardware WebGL acceleration available on Pi 5
+
+### Chromium Version Stability
+
+This system is optimized for **Chromium 142.0.7444.175**:
+- The installer automatically downgrades to this version
+- Chromium 143+ has known stability issues on Raspberry Pi 5
+- The installer prevents auto-updates using `apt-mark hold`
+- Do not manually upgrade Chromium unless testing
+
 ## Troubleshooting
+
+### System Health Check
+
+A comprehensive health check script is included to diagnose issues:
+
+```bash
+cd ~/kiosk-screensaver
+bash health-check.sh
+```
+
+This displays:
+- Current screensaver mode and uptime
+- Chromium process counts and memory usage
+- System load and temperature
+- Service status
+- Hardware acceleration status
+- Photo count
+
+Use this as your first diagnostic step when troubleshooting issues.
 
 ### Screensaver not activating
 
@@ -251,6 +306,42 @@ cat ~/.config/labwc/autostart
 
 # Restart labwc
 pkill labwc
+```
+
+### High CPU usage on dashboard
+
+**Normal behavior:**
+- Dashboard with H.264 camera streams: 15-25% CPU per stream (software decode)
+- WebGL content (weather radar, maps): 50-95% GPU process CPU
+- Idle dashboard: 5-15% CPU
+
+**If CPU is higher than expected:**
+```bash
+# Check which Chromium processes are using CPU
+top -p $(pgrep chromium | tr '\n' ',' | sed 's/,$//')
+
+# Verify Chromium version (should be 142.0.7444.175)
+chromium --version
+
+# Check for multiple Chromium instances
+pgrep -a chromium | wc -l
+
+# Verify VAAPI hardware decode is active
+grep -i vaapi /proc/$(pgrep chromium | head -1)/environ
+```
+
+### System becoming unresponsive over time
+
+This was a known issue caused by multiple Chromium instances accumulating. Fixed in current version:
+
+```bash
+# Verify you have the latest modes.py with process cleanup
+grep -A 5 "Kill existing slideshow" ~/kiosk-screensaver/screensaver/modes.py
+
+# Check for process accumulation
+pgrep -a chromium | grep -E 'slideshow|screensaver'
+
+# If you see old processes, update to latest version
 ```
 
 ### Web admin not accessible
@@ -335,6 +426,8 @@ features:
    - Day mode: Launches Chromium with slideshow
    - Night mode: Blank screen + monitor power off
    - Handles mode transitions
+   - **Process cleanup**: Kills old slideshow/night instances before launching new ones
+   - **Cache clearing**: Removes Chromium cache on each launch to prevent memory buildup
 
 ### File Structure
 

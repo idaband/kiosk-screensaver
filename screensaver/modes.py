@@ -109,8 +109,26 @@ class ModeHandler:
             True if launched successfully
         """
         try:
-            python_port = self.config.get('network', 'python_port', default=8091)
+            # CRITICAL: Kill existing slideshow/night instances to prevent memory leaks
+            # Multiple Chromium instances cause severe memory leaks on Raspberry Pi
+            # https://forums.raspberrypi.com/viewtopic.php?t=296598
+            logger.info("Killing existing slideshow/night Chromium instances")
+            subprocess.run(['pkill', '-f', 'chromium.*slideshow.html'], stderr=subprocess.DEVNULL)
+            subprocess.run(['pkill', '-f', 'chromium.*screensaver.html'], stderr=subprocess.DEVNULL)
+            time.sleep(1)  # Wait for processes to fully terminate
+
+            # Clear slideshow profile cache to prevent memory buildup
             profile = self.config.get('paths', 'chromium_slideshow_profile')
+            cache_dirs = ['Cache', 'Code Cache', 'GPUCache', 'Service Worker']
+            for cache_dir in cache_dirs:
+                cache_path = os.path.join(os.path.expanduser(profile), cache_dir)
+                if os.path.exists(cache_path):
+                    try:
+                        subprocess.run(['rm', '-rf', cache_path], stderr=subprocess.DEVNULL)
+                    except:
+                        pass
+
+            python_port = self.config.get('network', 'python_port', default=8091)
             hw_accel = self.config.get('chromium', 'hardware_acceleration', default=True)
 
             # Build chromium command - use --start-fullscreen NOT --kiosk
@@ -121,10 +139,20 @@ class ModeHandler:
                 f'--user-data-dir={profile}',
                 '--ozone-platform=wayland',  # CRITICAL: Force Wayland instead of X11
                 '--start-fullscreen',  # Fullscreen window, NOT kiosk mode
+                '--window-size=9999,9999',  # Force oversized window so Wayland corrects to fullscreen
                 '--noerrdialogs',
                 '--disable-infobars',
                 '--no-first-run',
-                '--kiosk-printing'  # Hide cursor on touchscreen
+                '--kiosk-printing',  # Hide cursor on touchscreen
+                '--password-store=basic',  # Use basic password store
+                '--use-mock-keychain',  # Use mock keychain to prevent password prompts
+                # Memory leak prevention flags
+                '--disable-background-networking',  # Prevent background requests
+                '--disable-extensions',  # Disable extensions to reduce memory
+                '--disable-sync',  # Disable Google sync
+                '--metrics-recording-only',  # Disable metrics upload
+                '--disable-background-timer-throttling',  # Prevent timer accumulation
+                '--disk-cache-size=1'  # Minimal disk cache to prevent buildup
             ]
 
             # Add hardware acceleration flags
@@ -172,10 +200,26 @@ class ModeHandler:
             True if launched successfully
         """
         try:
+            # CRITICAL: Kill existing slideshow/night instances to prevent memory leaks
+            logger.info("Killing existing slideshow/night Chromium instances")
+            subprocess.run(['pkill', '-f', 'chromium.*slideshow.html'], stderr=subprocess.DEVNULL)
+            subprocess.run(['pkill', '-f', 'chromium.*screensaver.html'], stderr=subprocess.DEVNULL)
+            time.sleep(1)  # Wait for processes to fully terminate
+
             if profile_type == 'night':
                 profile = self.config.get('paths', 'chromium_night_profile')
             else:
                 profile = self.config.get('paths', 'chromium_slideshow_profile')
+
+            # Clear profile cache to prevent memory buildup
+            cache_dirs = ['Cache', 'Code Cache', 'GPUCache', 'Service Worker']
+            for cache_dir in cache_dirs:
+                cache_path = os.path.join(os.path.expanduser(profile), cache_dir)
+                if os.path.exists(cache_path):
+                    try:
+                        subprocess.run(['rm', '-rf', cache_path], stderr=subprocess.DEVNULL)
+                    except:
+                        pass
 
             screensaver_html = self.config.get('paths', 'screensaver_html')
             hw_accel = self.config.get('chromium', 'hardware_acceleration', default=True)
@@ -186,7 +230,17 @@ class ModeHandler:
                 f'--user-data-dir={profile}',
                 '--ozone-platform=wayland',  # CRITICAL: Force Wayland instead of X11
                 '--start-fullscreen',  # Fullscreen window, NOT kiosk mode
-                '--kiosk-printing'  # Hide cursor on touchscreen
+                '--window-size=9999,9999',  # Force oversized window so Wayland corrects to fullscreen
+                '--kiosk-printing',  # Hide cursor on touchscreen
+                '--password-store=basic',  # Use basic password store
+                '--use-mock-keychain',  # Use mock keychain to prevent password prompts
+                # Memory leak prevention flags
+                '--disable-background-networking',  # Prevent background requests
+                '--disable-extensions',  # Disable extensions to reduce memory
+                '--disable-sync',  # Disable Google sync
+                '--metrics-recording-only',  # Disable metrics upload
+                '--disable-background-timer-throttling',  # Prevent timer accumulation
+                '--disk-cache-size=1'  # Minimal disk cache to prevent buildup
             ]
 
             if hw_accel:

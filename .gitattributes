@@ -1,0 +1,19 @@
+# Force LF line endings for shell scripts (prevents issues when transferring from Windows to Linux)
+*.sh text eol=lf
+
+# Python files should also use LF
+*.py text eol=lf
+
+# YAML files use LF
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Markdown and text files use LF
+*.md text eol=lf
+*.txt text eol=lf
+
+# HTML/CSS/JS use LF
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.json text eol=lf

@@ -102,6 +102,50 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     fi
 
     echo "✓ System dependencies installed"
+
+    # Downgrade Chromium to stable version 142.0.7444.175
+    # Chromium 143+ has severe stability issues on Raspberry Pi 5
+    # https://forums.raspberrypi.com/viewtopic.php?t=308303
+    echo
+    echo "Downgrading Chromium to stable version 142.0.7444.175..."
+    CURRENT_CHROMIUM=$(chromium --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+\.\d+' || echo "unknown")
+    echo "Current Chromium version: $CURRENT_CHROMIUM"
+
+    if [[ "$CURRENT_CHROMIUM" != "142.0.7444.175" ]]; then
+        echo "Downloading Chromium 142.0.7444.175 packages..."
+        cd /tmp
+        wget -q http://archive.raspberrypi.org/debian/pool/main/c/chromium/chromium_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
+        wget -q http://archive.raspberrypi.org/debian/pool/main/c/chromium/chromium-common_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
+        wget -q http://archive.raspberrypi.org/debian/pool/main/c/chromium/chromium-sandbox_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
+
+        echo "Installing Chromium 142.0.7444.175..."
+        sudo apt install -y --allow-downgrades \
+            ./chromium_142.0.7444.175-1~deb13u1+rpt1_arm64.deb \
+            ./chromium-common_142.0.7444.175-1~deb13u1+rpt1_arm64.deb \
+            ./chromium-sandbox_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
+
+        echo "Holding Chromium at version 142.0.7444.175 (prevents auto-update)..."
+        sudo apt-mark hold chromium chromium-common chromium-sandbox
+
+        rm -f /tmp/chromium*.deb
+        echo "✓ Chromium downgraded to 142.0.7444.175 and held"
+    else
+        echo "✓ Chromium already at stable version 142.0.7444.175"
+        sudo apt-mark hold chromium chromium-common chromium-sandbox 2>/dev/null || true
+    fi
+
+    # Disable Plymouth boot splash screen (prevents bright white screen during night reboots)
+    echo
+    echo "Disabling Plymouth boot splash screen..."
+    if dpkg -l | grep -q plymouth; then
+        sudo systemctl disable plymouth.service 2>/dev/null || true
+        sudo systemctl mask plymouth.service 2>/dev/null || true
+        sudo apt-get remove -y plymouth plymouth-themes 2>/dev/null || true
+        sudo update-initramfs -u 2>/dev/null || true
+        echo "✓ Plymouth boot splash disabled"
+    else
+        echo "✓ Plymouth not installed, skipping"
+    fi
 else
     echo "Skipping dependency installation"
 fi
@@ -353,12 +397,30 @@ rm /tmp/screensaver.service /tmp/screensaver-web.service
 echo "✓ Systemd services installed"
 
 # ==============================================================================
-# STEP 9: Configure labwc autostart
+# STEP 9: Clear Chromium cache for clean installation
 # ==============================================================================
 echo
 echo "========================================================"
-echo "STEP 9/10: Configuring Wayland Compositor Autostart"
+echo "STEP 9/10: Clearing Chromium Cache"
 echo "========================================================"
+
+echo "Clearing existing Chromium cache..."
+if [ -d "$USER_HOME/.config/chromium" ] || [ -d "$USER_HOME/.cache/chromium" ]; then
+    rm -rf "$USER_HOME/.config/chromium" "$USER_HOME/.cache/chromium"
+    echo "✓ Chromium cache cleared"
+    echo "  This ensures a clean start with new configuration"
+else
+    echo "✓ No existing Chromium cache found"
+fi
+
+# ==============================================================================
+# STEP 10: Configure touchscreen for multi-touch
+# ==============================================================================
+echo
+echo "========================================================"
+echo "STEP 10/10: Configuring Touchscreen"
+echo "========================================================"
+echo "Configuring touchscreen for multi-touch mode..."
 
 AUTOSTART_DIR="$USER_HOME/.config/labwc"
 AUTOSTART_FILE="$AUTOSTART_DIR/autostart"
@@ -382,14 +444,21 @@ fi
 # Add Home Assistant dashboard (starts first)
 cat >> "$AUTOSTART_FILE" <<EOF
 
-# Disable D-Bus keyring access to prevent password prompts
-export DBUS_SESSION_BUS_ADDRESS=/dev/null
+# Start gnome-keyring to prevent Chromium password prompts
+eval \$(gnome-keyring-daemon --start --components=secrets)
+export SSH_AUTH_SOCK
+
+# Set monitor input to HDMI (VCP code 62, value 100 = HDMI)
+ddcutil setvcp 62 100 &
+
+# Set VAAPI hardware video decode driver for Pi 5
+export LIBVA_DRIVER_NAME=v3d_video
 
 # Hide mouse cursor after 2 seconds of inactivity
 unclutter -idle 2 -root &
 
 # Home Assistant Dashboard (Chromium Kiosk Mode)
-chromium --password-store=basic --use-mock-keychain --kiosk --noerrdialogs --disable-infobars --no-first-run --disable-sync --disable-features=PasswordManager,PasswordManagerOnboarding --ignore-certificate-errors $DASHBOARD_URL &
+chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --check-for-update-interval=31536000 --password-store=basic --disable-features=WakeLockSensor,IdleDetection,MediaSession --use-gl=egl --enable-features=VaapiVideoDecoder,VaapiVideoEncoder --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy --ignore-certificate-errors $DASHBOARD_URL &
 
 # Kiosk Screensaver (Python version) - log startup to file for debugging
 cd $INSTALL_DIR && PYTHONPATH=$INSTALL_DIR python3 -m screensaver.main -c $INSTALL_DIR/config.yaml >> $USER_HOME/screensaver-startup.log 2>&1 &
@@ -398,6 +467,57 @@ EOF
 echo "✓ labwc autostart configured"
 echo "  Dashboard will launch first, then screensaver"
 
+# ==============================================================================
+# STEP 7: Configure touchscreen for multi-touch
+# ==============================================================================
+echo
+echo "========================================================"
+echo "STEP 7/10: Configuring Touchscreen"
+echo "========================================================"
+echo "Configuring touchscreen for multi-touch mode..."
+
+# Create libinput quirks directory if it doesn't exist
+sudo mkdir -p /etc/libinput
+
+# Create libinput quirks file for persistent touchscreen configuration
+sudo tee /etc/libinput/local-overrides.quirks > /dev/null <<'EOF'
+[Touchscreen Multi-Touch Configuration]
+MatchUdevType=touchscreen
+AttrTouchSizeRange=0:0
+AttrPressureRange=0:0
+AttrPalmPressureThreshold=200
+
+[Enable Finger Tracking]
+MatchUdevType=touchscreen
+AttrFingerHighPressureThreshold=5
+EOF
+
+# Create labwc rc.xml to disable mouse emulation for touchscreen
+RC_XML_FILE="$AUTOSTART_DIR/rc.xml"
+cat > "$RC_XML_FILE" <<'EOF'
+<?xml version="1.0"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+	<touch deviceName="ILITEK       TES, MicroTouch PCT Controller                          EK-TOUCH" mapToOutput="HDMI-A-2" mouseEmulation="no"/>
+</openbox_config>
+EOF
+
+# Create labwc environment file with keyboard layout
+ENVIRONMENT_FILE="$AUTOSTART_DIR/environment"
+cat > "$ENVIRONMENT_FILE" <<'EOF'
+XKB_DEFAULT_MODEL=pc105
+XKB_DEFAULT_LAYOUT=us
+XKB_DEFAULT_VARIANT=
+XKB_DEFAULT_OPTIONS=
+EOF
+
+echo "✓ Touchscreen configured for multi-touch mode"
+echo "  libinput quirks: /etc/libinput/local-overrides.quirks"
+echo "  labwc rc.xml: $RC_XML_FILE (specific device mapping)"
+echo "  labwc environment: $ENVIRONMENT_FILE (keyboard layout)"
+
+# ==============================================================================
+# STEP 8: Configure labwc to start on login
+# ==============================================================================
 # Configure labwc to start on login (tty1 only)
 echo
 echo "Configuring labwc to start on login..."
@@ -417,11 +537,11 @@ EOF
 fi
 
 # ==============================================================================
-# STEP 10: Generate initial photo list
+# STEP 11: Generate initial photo list
 # ==============================================================================
 echo
 echo "========================================================"
-echo "STEP 10/11: Generating Initial Photo List"
+echo "STEP 11/11: Generating Initial Photo List"
 echo "========================================================"
 
 if [ -d "$PHOTO_PATH" ]; then
@@ -441,11 +561,11 @@ else
 fi
 
 # ==============================================================================
-# STEP 11: Enable and start web admin service
+# STEP 12: Enable and start web admin service
 # ==============================================================================
 echo
 echo "========================================================"
-echo "STEP 11/11: Configuring Web Admin Service"
+echo "STEP 12/12: Configuring Web Admin Service"
 echo "========================================================"
 
 sudo systemctl enable screensaver-web.service 2>/dev/null && {
