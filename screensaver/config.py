@@ -140,13 +140,27 @@ class Config:
                 errors.append("timing.day_mode_start_time must be valid HHMM format")
 
         if night_time:
-            # New HHMM format
-            try:
-                time_val = int(night_time)
-                if not (0 <= time_val <= 2359):
-                    errors.append("timing.night_mode_start_time must be 0000-2359")
-            except (ValueError, TypeError):
-                errors.append("timing.night_mode_start_time must be valid HHMM format")
+            # Handle both old (string) and new (dict) formats
+            if isinstance(night_time, dict):
+                # New per-day format - validate each day
+                days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                for day in days:
+                    day_time = night_time.get(day)
+                    if day_time:
+                        try:
+                            time_val = int(day_time)
+                            if not (0 <= time_val <= 2359):
+                                errors.append(f"timing.night_mode_start_time.{day} must be 0000-2359")
+                        except (ValueError, TypeError):
+                            errors.append(f"timing.night_mode_start_time.{day} must be valid HHMM format")
+            else:
+                # Old single-value HHMM format
+                try:
+                    time_val = int(night_time)
+                    if not (0 <= time_val <= 2359):
+                        errors.append("timing.night_mode_start_time must be 0000-2359")
+                except (ValueError, TypeError):
+                    errors.append("timing.night_mode_start_time must be valid HHMM format")
 
         # Validate network ports
         network = self.data.get('network', {})
