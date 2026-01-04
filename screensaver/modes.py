@@ -336,10 +336,22 @@ class ModeHandler:
         """
         now = datetime.now()
         current_time = now.hour * 100 + now.minute  # Convert to HHMM format (e.g., 1635)
+        day_name = now.strftime('%A').lower()  # 'monday', 'tuesday', etc.
 
-        # Get time strings (format: "HHMM" like "0615" or "2300")
+        # Day start time is the same every day
         start_str = self.config.get('timing', 'day_mode_start_time', default='0600')
-        night_str = self.config.get('timing', 'night_mode_start_time', default='2300')
+
+        # Night start time can vary by day of week
+        night_times = self.config.get('timing', 'night_mode_start_time', default='2200')
+
+        # Handle both old format (string) and new format (dict)
+        if isinstance(night_times, dict):
+            night_str = night_times.get(day_name)
+            if night_str is None:
+                logger.warning(f"No night time configured for {day_name}, using default 2200")
+                night_str = '2200'  # Default fallback
+        else:
+            night_str = night_times  # Old single-value format
 
         # Parse HHMM strings to integers
         try:
@@ -349,7 +361,7 @@ class ModeHandler:
             logger.error(f"Invalid time format in config: start={start_str}, night={night_str}")
             # Fallback to default times
             start_time = 600   # 6:00 AM
-            night_time = 2300  # 11:00 PM
+            night_time = 2200  # 10:00 PM
 
         # Day mode is active from start_time until night_time
         return start_time <= current_time < night_time
