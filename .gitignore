@@ -11,6 +11,7 @@ dist/
 build/
 
 # Generated files
+config.yaml
 photo-list.json
 *.log
 

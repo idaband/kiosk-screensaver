@@ -135,6 +135,7 @@ class HTTPServerManager:
         """
         logger.info(f"Waiting for server at {url}")
         start_time = time.time()
+        last_error = None
 
         while time.time() - start_time < timeout:
             try:
@@ -142,12 +143,13 @@ class HTTPServerManager:
                 if response.status_code in [200, 404]:  # 404 is OK for directory listing
                     logger.info(f"Server ready at {url}")
                     return True
-            except requests.exceptions.RequestException:
+            except requests.exceptions.RequestException as e:
+                last_error = str(e)
                 pass
 
             time.sleep(0.5)
 
-        logger.error(f"Server at {url} not ready after {timeout}s")
+        logger.error(f"Server at {url} not ready after {timeout}s. Last error: {last_error}")
         return False
 
     def start_all(self) -> bool:

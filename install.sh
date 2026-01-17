@@ -66,6 +66,7 @@ echo "  - ddcutil (monitor brightness control via DDC/CI)"
 echo "  - wlopm (Wayland output power management)"
 echo "  - chromium (web browser for dashboard and slideshow)"
 echo "  - rclone (file serving)"
+echo "  - iw (WiFi power management control)"
 echo "  - python3 and pip"
 echo
 
@@ -81,6 +82,7 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         ddcutil \
         chromium \
         rclone \
+        iw \
         python3 \
         python3-pip \
         procps \
@@ -535,6 +537,74 @@ fi
 EOF
     echo "✓ labwc will auto-start on console login"
 fi
+
+# ==============================================================================
+# STEP 9: Disable WiFi Power Save (prevents network dropouts)
+# ==============================================================================
+echo
+echo "========================================================"
+echo "STEP 9/12: Disabling WiFi Power Save"
+echo "========================================================"
+echo
+echo "WiFi power save can cause brief network dropouts during:"
+echo "  - Wake from screensaver"
+echo "  - High CPU/GPU load (photo transitions)"
+echo "  - Idle periods"
+echo
+echo "This step will disable WiFi power management for stability."
+echo
+
+# Create systemd service to disable WiFi power save on boot
+WIFI_SERVICE_FILE="/etc/systemd/system/disable-wifi-powersave.service"
+
+echo "Creating systemd service to disable WiFi power save..."
+sudo tee "$WIFI_SERVICE_FILE" > /dev/null <<'EOF'
+[Unit]
+Description=Disable WiFi Power Save
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Disable power management on wlan0
+ExecStart=/usr/sbin/iw dev wlan0 set power_save off
+# If iw is not available, try iwconfig
+ExecStart=-/usr/sbin/iwconfig wlan0 power off
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start the service
+sudo systemctl daemon-reload
+sudo systemctl enable disable-wifi-powersave.service 2>/dev/null && {
+    echo "✓ WiFi power save disable service enabled (will run on boot)"
+} || {
+    echo "⚠ Failed to enable WiFi power save disable service"
+}
+
+# Disable WiFi power save immediately
+echo "Disabling WiFi power save now..."
+if command -v iw &> /dev/null; then
+    sudo iw dev wlan0 set power_save off 2>/dev/null && {
+        echo "✓ WiFi power save disabled (iw command)"
+    } || {
+        echo "⚠ Could not disable WiFi power save with iw (may not be using WiFi)"
+    }
+elif command -v iwconfig &> /dev/null; then
+    sudo iwconfig wlan0 power off 2>/dev/null && {
+        echo "✓ WiFi power save disabled (iwconfig command)"
+    } || {
+        echo "⚠ Could not disable WiFi power save with iwconfig (may not be using WiFi)"
+    }
+else
+    echo "⚠ Neither iw nor iwconfig found - cannot disable WiFi power save"
+    echo "  You may need to install wireless-tools or iw package"
+fi
+
+echo
+echo "✓ WiFi power save configuration complete"
 
 # ==============================================================================
 # STEP 11: Generate initial photo list
