@@ -22,11 +22,19 @@ sleep 1
 
 # Launch night mode (blank screen)
 chromium --new-window --user-data-dir=/tmp/chromium-screensaver-night \
-    --ozone-platform=wayland --start-fullscreen --noerrdialogs \
-    --disable-infobars --no-first-run --kiosk-printing \
-    --use-gl=egl --enable-features=VaapiVideoDecoder,VaapiVideoEncoder \
-    --ignore-gpu-rasterization --enable-zero-copy \
-    --force-dark-mode --enable-features=WebUIDarkMode \
+    --ozone-platform=wayland \
+    --touch-events=enabled \
+    --start-fullscreen \
+    --noerrdialogs \
+    --disable-infobars \
+    --no-first-run \
+    --kiosk-printing \
+    --use-gl=egl \
+    --enable-features=VaapiVideoDecoder,VaapiVideoEncoder \
+    --ignore-gpu-rasterization \
+    --enable-zero-copy \
+    --force-dark-mode \
+    --enable-features=WebUIDarkMode \
     --app=file://$INSTALL_DIR/static/screensaver.html &
 
 sleep 1
