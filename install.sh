@@ -105,35 +105,75 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
 
     echo "✓ System dependencies installed"
 
-    # Downgrade Chromium to stable version 142.0.7444.175
-    # Chromium 143+ has severe stability issues on Raspberry Pi 5
-    # https://forums.raspberrypi.com/viewtopic.php?t=308303
+    # Chromium handling policy:
+    # - Install the distro-provided Chromium by default (no automatic downgrades)
+    # - Only offer to downgrade if we detect a known-bad version (e.g. 143+ on Pi 5)
     echo
-    echo "Downgrading Chromium to stable version 142.0.7444.175..."
-    CURRENT_CHROMIUM=$(chromium --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+\.\d+' || echo "unknown")
-    echo "Current Chromium version: $CURRENT_CHROMIUM"
+    DESIRED_CHROMIUM_VERSION="142.0.7444.175"
 
-    if [[ "$CURRENT_CHROMIUM" < "142.0.7444.175" ]]; then
-        echo "Downloading Chromium 142.0.7444.175 packages..."
-        cd /tmp
-        wget -q http://archive.raspberrypi.org/debian/pool/main/c/chromium/chromium_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
-        wget -q http://archive.raspberrypi.org/debian/pool/main/c/chromium/chromium-common_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
-        wget -q http://archive.raspberrypi.org/debian/pool/main/c/chromium/chromium-sandbox_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
-
-        echo "Installing Chromium 142.0.7444.175..."
-        sudo apt install -y --allow-downgrades \
-            ./chromium_142.0.7444.175-1~deb13u1+rpt1_arm64.deb \
-            ./chromium-common_142.0.7444.175-1~deb13u1+rpt1_arm64.deb \
-            ./chromium-sandbox_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
-
-        echo "Holding Chromium at version 142.0.7444.175 (prevents auto-update)..."
-        sudo apt-mark hold chromium chromium-common chromium-sandbox
-
-        rm -f /tmp/chromium*.deb
-        echo "✓ Chromium downgraded to 142.0.7444.175 and held"
+    # Report current installed version (if any)
+    CURRENT_CHROMIUM=$(chromium --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+\.\d+' || true)
+    if [ -z "$CURRENT_CHROMIUM" ]; then
+        echo "Chromium: not currently installed (will use distro package)"
     else
-        echo "✓ Chromium already at stable version 142.0.7444.175"
-        sudo apt-mark hold chromium chromium-common chromium-sandbox 2>/dev/null || true
+        echo "Chromium: detected version $CURRENT_CHROMIUM"
+    fi
+
+    # Do not automatically downgrade. If we detect a problematic version range,
+    # prompt the user to optionally downgrade to the known-good $DESIRED_CHROMIUM_VERSION.
+    if [ -n "$CURRENT_CHROMIUM" ] && dpkg --compare-versions "$CURRENT_CHROMIUM" "ge" "143.0.0"; then
+        echo
+        echo "⚠ Detected Chromium $CURRENT_CHROMIUM — some Raspberry Pi 5 users report instability with Chromium 143+"
+        echo "We recommend downgrading to $DESIRED_CHROMIUM_VERSION if you encounter crashes or rendering issues."
+        read -p "Downgrade Chromium to $DESIRED_CHROMIUM_VERSION now? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "Proceeding with downgrade to $DESIRED_CHROMIUM_VERSION..."
+            cd /tmp
+
+            PKG_BASE="chromium_142.0.7444.175-1~deb13u1+rpt1_arm64.deb"
+            PKG_COMMON="chromium-common_142.0.7444.175-1~deb13u1+rpt1_arm64.deb"
+            PKG_SANDBOX="chromium-sandbox_142.0.7444.175-1~deb13u1+rpt1_arm64.deb"
+            BASE_URL="http://archive.raspberrypi.org/debian/pool/main/c/chromium"
+
+            # Check availability before downloading
+            for p in "$PKG_BASE" "$PKG_COMMON" "$PKG_SANDBOX"; do
+                url="$BASE_URL/$p"
+                echo "Checking $url"
+                if ! wget -q --spider "$url"; then
+                    echo "⚠ Chromium package not found at: $url"
+                    echo "  Unable to perform automated downgrade. Please install manually if desired."
+                    PKG_BASE=""
+                    break
+                fi
+            done
+
+            if [ -n "$PKG_BASE" ]; then
+                wget -q "$BASE_URL/$PKG_BASE"
+                wget -q "$BASE_URL/$PKG_COMMON"
+                wget -q "$BASE_URL/$PKG_SANDBOX"
+
+                echo "Installing Chromium packages..."
+                sudo apt install -y --allow-downgrades ./$PKG_BASE ./$PKG_COMMON ./$PKG_SANDBOX || {
+                    echo "Attempting to fix dependencies and retry..."
+                    sudo apt-get -f install -y
+                    sudo apt install -y --allow-downgrades ./$PKG_BASE ./$PKG_COMMON ./$PKG_SANDBOX || {
+                        echo "✗ Failed to install Chromium packages automatically"
+                    }
+                }
+
+                echo "Holding Chromium packages to prevent auto-upgrade..."
+                sudo apt-mark hold chromium chromium-common chromium-sandbox || true
+
+                rm -f /tmp/chromium*.deb
+                echo "✓ Chromium downgraded to $DESIRED_CHROMIUM_VERSION and held (if install succeeded)"
+            fi
+        else
+            echo "Skipping downgrade. Using distro Chromium version ($CURRENT_CHROMIUM)."
+            echo "If you later want to downgrade, re-run this script or follow instructions in TROUBLESHOOTING.md"
+        fi
+    else
+        echo "Using distro Chromium package (no downgrade necessary)."
     fi
 
     # Disable Plymouth boot splash screen (prevents bright white screen during night reboots)
