@@ -225,6 +225,10 @@ echo
 echo "IMPORTANT: Use your LOCAL network IP address, NOT DuckDNS or external URL"
 echo "External URLs may cause connectivity issues or slow loading"
 read -p "Dashboard URL: " DASHBOARD_URL
+DASHBOARD_URL="${DASHBOARD_URL:-http://127.0.0.1:8123}"
+if [[ "$DASHBOARD_URL" != http://* && "$DASHBOARD_URL" != https://* ]]; then
+    DASHBOARD_URL="http://$DASHBOARD_URL"
+fi
 echo "✓ Dashboard URL: $DASHBOARD_URL"
 
 # Photo source path
@@ -443,7 +447,25 @@ export LIBVA_DRIVER_NAME=v3d_video
 unclutter -idle 2 -root &
 
 # Home Assistant Dashboard (Chromium Kiosk Mode)
-chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --check-for-update-interval=31536000 --password-store=basic --disable-features=WakeLockSensor,IdleDetection,MediaSession --use-gl=egl --enable-features=VaapiVideoDecoder,VaapiVideoEncoder --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy --ignore-certificate-errors $DASHBOARD_URL &
+chromium \
+  --ozone-platform=wayland \
+  --touch-events=enabled \
+  --force-device-scale-factor=1.5 \
+  --default-zoom-level=1.5 \
+  --kiosk \
+  --noerrdialogs \
+  --disable-infobars \
+  --no-first-run \
+  --check-for-update-interval=31536000 \
+  --password-store=basic \
+  --disable-features=WakeLockSensor,IdleDetection,MediaSession \
+  --use-gl=egl \
+  --enable-features=VaapiVideoDecoder,VaapiVideoEncoder \
+  --ignore-gpu-blocklist \
+  --enable-gpu-rasterization \
+  --enable-zero-copy \
+  --ignore-certificate-errors \
+  "$DASHBOARD_URL" &
 
 # Kiosk Screensaver (Python version) - log startup to file for debugging
 cd $INSTALL_DIR && PYTHONPATH=$INSTALL_DIR python3 -m screensaver.main -c $INSTALL_DIR/config.yaml >> $USER_HOME/screensaver-startup.log 2>&1 &
