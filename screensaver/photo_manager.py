@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import subprocess
+from datetime import date
 from pathlib import Path
 from typing import List
 from urllib.parse import quote
@@ -40,14 +41,38 @@ class PhotoManager:
         self.scheduler_thread = None
         self.scheduler_running = False
 
-    def generate_photo_list(self) -> bool:
+    def get_active_source_path(self, today: date = None) -> str:
+        """Select today's special folder, or the configured default folder."""
+        today = today or date.today()
+        date_key = today.strftime('%m-%d')
+        default_path = os.path.abspath(
+            os.path.expanduser(self.config.get('network', 'photo_source_path'))
+        )
+
+        special_slideshows = self.config.get('photos', 'special_slideshows', default=[])
+        for slideshow in special_slideshows:
+            if slideshow.get('date') == date_key:
+                special_path = os.path.abspath(os.path.expanduser(slideshow['folder']))
+                if os.path.isdir(special_path):
+                    return special_path
+                logger.error(
+                    "Special slideshow folder for %s is unavailable: %s; using default",
+                    date_key,
+                    special_path,
+                )
+                break
+
+        return default_path
+
+    def generate_photo_list(self, today: date = None) -> bool:
         """Generate photo list JSON file.
 
         Returns:
             True if successful
         """
         try:
-            photo_path = self.config.get('network', 'photo_source_path')
+            photo_path = self.get_active_source_path(today)
+            server_root = self.config.photo_server_root()
             max_size_mb = self.config.get('photos', 'max_size_mb', default=10)
             extensions = self.config.get('photos', 'extensions', default=['jpg', 'jpeg', 'png', 'gif'])
             rclone_port = self.config.get('network', 'rclone_port', default=8090)
@@ -80,8 +105,8 @@ class PhotoManager:
                 if not line:
                     continue
 
-                # Convert absolute path to relative path from photo_path
-                rel_path = os.path.relpath(line, photo_path)
+                # Include the selected folder beneath rclone's shared root.
+                rel_path = os.path.relpath(line, server_root)
                 # URL encode the path (handle spaces and special characters)
                 encoded_path = quote(rel_path)
                 url = f"http://127.0.0.1:{rclone_port}/{encoded_path}"
@@ -100,18 +125,7 @@ class PhotoManager:
             os.replace(temp_path, self.photo_list_path)
 
             logger.info(f"Photo list written to {self.photo_list_path}")
-
-            # Also copy to static folder for HTTP server access
-            # Get static dir - use absolute path from config
-            config_path = self.config.config_path
-            if config_path:
-                # Derive static dir from config path location
-                config_dir = os.path.dirname(os.path.abspath(config_path))
-                static_dir = os.path.join(config_dir, 'static')
-            else:
-                # Fallback to config value
-                static_dir = self.config.get('paths', 'static_dir', default=os.path.expanduser('~/kiosk-screensaver/static'))
-
+            static_dir = self.config.static_dir()
             static_photo_list = os.path.join(static_dir, 'photo-list.json')
             try:
                 os.makedirs(static_dir, exist_ok=True)
@@ -162,7 +176,6 @@ class PhotoManager:
             return {'day_of_week': '*', 'time': '02:00'}
 
         minute, hour, day, month, weekday = parts
-
         # Convert to new format
         time_str = f"{hour.zfill(2)}:{minute.zfill(2)}"
 

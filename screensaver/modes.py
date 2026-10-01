@@ -49,6 +49,11 @@ class ModeHandler:
         else:
             return self._launch_slideshow()
 
+    def refresh_day_slideshow(self) -> bool:
+        """Relaunch the active day slideshow after its photo list changes."""
+        logger.info("Refreshing daytime slideshow photo list")
+        return self._launch_slideshow()
+
     def activate_night_mode(self) -> bool:
         """Activate nighttime screensaver (blank screen, monitor off).
 

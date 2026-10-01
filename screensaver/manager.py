@@ -4,7 +4,9 @@ import logging
 import os
 import signal
 import sys
+import threading
 import time
+from datetime import date
 from inotify_simple import INotify, flags
 
 
@@ -32,6 +34,8 @@ class ScreensaverManager:
         self.inotify = None
         self.current_mode = None  # Track current mode: 'day' or 'night'
         self.startup_time = time.time()  # Track when screensaver process started
+        self.current_photo_date = None
+        self._photo_refresh_lock = threading.Lock()
 
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -51,11 +55,11 @@ class ScreensaverManager:
         # Write slideshow config file for static HTTP server
         self._write_slideshow_config()
 
-        # Generate initial photo list if it doesn't exist
-        photo_list_path = self.config.get('paths', 'photo_list_json')
-        if not os.path.exists(photo_list_path):
-            logger.info("Generating initial photo list")
-            self.photo_manager.generate_photo_list()
+        # Generate the photo list for the current date.
+        logger.info("Generating photo list for the current date")
+        current_date = date.today()
+        if self.photo_manager.generate_photo_list(current_date):
+            self.current_photo_date = current_date
 
         # Start auto-regeneration scheduler
         self.photo_manager.start_auto_regeneration()
@@ -134,6 +138,37 @@ class ScreensaverManager:
 
                 # Check for time-based mode transitions
                 self._check_time_boundary()
+
+            self._check_photo_date()
+
+    def _check_photo_date(self) -> None:
+        """Regenerate the photo list when the local calendar date changes."""
+        today = date.today()
+        if today == self.current_photo_date or self._photo_refresh_lock.locked():
+            return
+
+        threading.Thread(
+            target=self._refresh_photo_list_for_date,
+            args=(today,),
+            daemon=True,
+        ).start()
+
+    def _refresh_photo_list_for_date(self, today: date) -> None:
+        with self._photo_refresh_lock:
+            if today == self.current_photo_date:
+                return
+            if not self.photo_manager.generate_photo_list(today):
+                logger.error("Failed to regenerate photo list for %s", today)
+                return
+
+            self.current_photo_date = today
+            if (
+                self.screensaver_active
+                and self.current_mode == 'day'
+                and not self.config.get('features', 'privacy_mode', default=False)
+            ):
+                if not self.mode_handler.refresh_day_slideshow():
+                    logger.error("Failed to refresh daytime slideshow for %s", today)
 
     def _on_input_detected(self) -> None:
         """Handle input detection."""
@@ -246,13 +281,7 @@ class ScreensaverManager:
     def _write_slideshow_config(self) -> None:
         """Write slideshow configuration to JSON file for static HTTP server."""
         try:
-            # Get the static directory
-            config_path = self.config.config_path
-            if config_path:
-                config_dir = os.path.dirname(os.path.abspath(config_path))
-                static_dir = os.path.join(config_dir, 'static')
-            else:
-                static_dir = self.config.get('paths', 'static_dir', default=os.path.expanduser('~/kiosk-screensaver/static'))
+            static_dir = self.config.static_dir()
 
             # Create slideshow config
             slideshow_config = {

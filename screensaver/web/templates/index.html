@@ -160,6 +160,19 @@
             margin-bottom: 20px;
         }
 
+        .special-slideshow-row {
+            grid-template-columns: minmax(130px, 0.7fr) minmax(220px, 2fr) auto;
+            align-items: end;
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 700px) {
+            .special-slideshow-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+        }
+
         .message {
             padding: 12px;
             border-radius: 4px;
@@ -440,6 +453,10 @@
                 <div class="help-text">Larger files are excluded from slideshow</div>
             </div>
         </div>
+        <h3>Special-Day Slideshows</h3>
+        <div class="help-text">Add annual dates in MM-DD format and the folder to show on that date. The default photo folder is used on all other days.</div>
+        <div id="specialSlideshows"></div>
+        <button type="button" class="secondary" onclick="addSpecialSlideshow()">Add special slideshow</button>
 
         <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #eee;">
             <button onclick="saveConfig()" class="success">💾 Save Configuration</button>
@@ -517,6 +534,8 @@
                 // Photos
                 document.getElementById('photoPath').value = config.network.photo_source_path;
                 document.getElementById('maxPhotoSize').value = config.photos.max_size_mb;
+                document.getElementById('specialSlideshows').replaceChildren();
+                (config.photos.special_slideshows || []).forEach(addSpecialSlideshow);
 
                 // Scheduled Reboot
                 const rebootConfig = config.features.scheduled_reboot || {enabled: false, frequency: 'weekly', day_of_week: 1, reboot_time: '0300'};
@@ -529,6 +548,53 @@
             } catch (error) {
                 showMessage('Failed to load configuration: ' + error.message, 'error');
             }
+        }
+
+        function addSpecialSlideshow(entry = {}) {
+            const row = document.createElement('div');
+            row.className = 'grid special-slideshow-row';
+
+            const dateField = document.createElement('div');
+            dateField.className = 'form-group';
+            const dateLabel = document.createElement('label');
+            dateLabel.textContent = 'Annual date (MM-DD)';
+            const dateInput = document.createElement('input');
+            dateInput.type = 'text';
+            dateInput.className = 'special-slideshow-date';
+            dateInput.placeholder = 'MM-DD';
+            dateInput.maxLength = 5;
+            dateInput.pattern = '(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])';
+            dateInput.value = entry.date || '';
+            dateField.append(dateLabel, dateInput);
+
+            const folderField = document.createElement('div');
+            folderField.className = 'form-group';
+            const folderLabel = document.createElement('label');
+            folderLabel.textContent = 'Folder path';
+            const folderInput = document.createElement('input');
+            folderInput.type = 'text';
+            folderInput.className = 'special-slideshow-folder';
+            folderInput.placeholder = '/mnt/photos/special-day';
+            folderInput.value = entry.folder || '';
+            folderField.append(folderLabel, folderInput);
+
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'secondary';
+            removeButton.textContent = 'Remove';
+            removeButton.addEventListener('click', () => row.remove());
+
+            row.append(dateField, folderField, removeButton);
+            document.getElementById('specialSlideshows').appendChild(row);
+        }
+
+        function getSpecialSlideshowEntries() {
+            return Array.from(document.querySelectorAll('.special-slideshow-row'))
+                .map(row => ({
+                    date: row.querySelector('.special-slideshow-date').value.trim(),
+                    folder: row.querySelector('.special-slideshow-folder').value.trim()
+                }))
+                .filter(entry => entry.date || entry.folder);
         }
 
         async function loadStatus() {
@@ -649,7 +715,8 @@
                         }
                     },
                     photos: {
-                        max_size_mb: parseInt(document.getElementById('maxPhotoSize').value)
+                        max_size_mb: parseInt(document.getElementById('maxPhotoSize').value),
+                        special_slideshows: getSpecialSlideshowEntries()
                     }
                 };
 

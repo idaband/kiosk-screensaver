@@ -60,7 +60,7 @@ class HTTPServerManager:
             return True
 
         try:
-            photo_path = self.config.get('network', 'photo_source_path')
+            photo_path = self.config.photo_server_root()
             host = self.config.get('network', 'rclone_host', default='127.0.0.1')
             port = self.config.get('network', 'rclone_port', default=8090)
 
