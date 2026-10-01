@@ -80,7 +80,6 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     sudo apt-get install -y \
         labwc \
         ddcutil \
-        chromium \
         rclone \
         iw \
         python3 \
@@ -105,35 +104,19 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
 
     echo "✓ System dependencies installed"
 
-    # Downgrade Chromium to stable version 142.0.7444.175
-    # Chromium 143+ has severe stability issues on Raspberry Pi 5
-    # https://forums.raspberrypi.com/viewtopic.php?t=308303
-    echo
-    echo "Downgrading Chromium to stable version 142.0.7444.175..."
-    CURRENT_CHROMIUM=$(chromium --version 2>/dev/null | grep -oP '\d+\.\d+\.\d+\.\d+' || echo "unknown")
-    echo "Current Chromium version: $CURRENT_CHROMIUM"
-
-    if [[ "$CURRENT_CHROMIUM" != "142.0.7444.175" ]]; then
-        echo "Downloading Chromium 142.0.7444.175 packages..."
-        cd /tmp
-        wget -q http://archive.raspberrypi.org/debian/pool/main/c/chromium/chromium_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
-        wget -q http://archive.raspberrypi.org/debian/pool/main/c/chromium/chromium-common_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
-        wget -q http://archive.raspberrypi.org/debian/pool/main/c/chromium/chromium-sandbox_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
-
-        echo "Installing Chromium 142.0.7444.175..."
-        sudo apt install -y --allow-downgrades \
-            ./chromium_142.0.7444.175-1~deb13u1+rpt1_arm64.deb \
-            ./chromium-common_142.0.7444.175-1~deb13u1+rpt1_arm64.deb \
-            ./chromium-sandbox_142.0.7444.175-1~deb13u1+rpt1_arm64.deb
-
-        echo "Holding Chromium at version 142.0.7444.175 (prevents auto-update)..."
-        sudo apt-mark hold chromium chromium-common chromium-sandbox
-
-        rm -f /tmp/chromium*.deb
-        echo "✓ Chromium downgraded to 142.0.7444.175 and held"
+    if [[ "$(dpkg-query -W -f='${db:Status-Status}' chromium 2>/dev/null || true)" == "installed" ]]; then
+        echo "✓ Chromium is already installed; leaving its version and package holds unchanged"
     else
-        echo "✓ Chromium already at stable version 142.0.7444.175"
-        sudo apt-mark hold chromium chromium-common chromium-sandbox 2>/dev/null || true
+        echo "Installing Chromium from the configured apt repositories..."
+        mapfile -t HELD_CHROMIUM_PACKAGES < <(
+            apt-mark showhold | grep -E '^(chromium|chromium-common|chromium-sandbox)$' || true
+        )
+        if (( ${#HELD_CHROMIUM_PACKAGES[@]} > 0 )); then
+            echo "Removing holds from Chromium packages so apt can resolve matching dependencies..."
+            sudo apt-mark unhold "${HELD_CHROMIUM_PACKAGES[@]}"
+        fi
+        sudo apt-get install -y chromium
+        echo "✓ Chromium installed from the configured apt repositories"
     fi
 
     # Disable Plymouth boot splash screen (prevents bright white screen during night reboots)
