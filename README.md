@@ -6,7 +6,7 @@ A comprehensive, configurable screensaver system for Raspberry Pi 5 kiosk displa
 
 Perfect for creating a wall-mounted Home Assistant dashboard that automatically shows a photo slideshow when idle.
 
-**Optimized for Raspberry Pi 5** with automatic Chromium version management and memory leak prevention for long-term stability.
+**Optimized for Raspberry Pi 5** with conditional Chromium installation and memory leak prevention for long-term stability.
 
 ## Features
 
@@ -243,13 +243,11 @@ The Raspberry Pi 5 has **limited hardware video decode** capabilities:
 - Can use 50-95% GPU process CPU depending on complexity
 - No hardware WebGL acceleration available on Pi 5
 
-### Chromium Version Stability
+### Chromium Installation
 
-This system is optimized for **Chromium 142.0.7444.175**:
-- The installer automatically downgrades to this version
-- Chromium 143+ has known stability issues on Raspberry Pi 5
-- The installer prevents auto-updates using `apt-mark hold`
-- Do not manually upgrade Chromium unless testing
+- The installer installs Chromium from the configured apt repositories only when it is not already installed.
+- Existing Chromium versions are left unchanged.
+- The installer does not pin a version, downgrade Chromium, or hold Chromium packages; package updates follow the operating system's apt configuration.
 
 ## Troubleshooting
 
@@ -323,7 +321,7 @@ pkill labwc
 # Check which Chromium processes are using CPU
 top -p $(pgrep chromium | tr '\n' ',' | sed 's/,$//')
 
-# Verify Chromium version (should be 142.0.7444.175)
+# Verify the installed Chromium version
 chromium --version
 
 # Check for multiple Chromium instances

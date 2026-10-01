@@ -1,6 +1,8 @@
 """Configuration management for kiosk screensaver."""
 import os
+import re
 import yaml
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
@@ -56,6 +58,12 @@ class Config:
                 config['network']['photo_source_path']
             )
 
+        special_slideshows = config.get('photos', {}).get('special_slideshows', [])
+        if isinstance(special_slideshows, list):
+            for slideshow in special_slideshows:
+                if isinstance(slideshow, dict) and isinstance(slideshow.get('folder'), str):
+                    slideshow['folder'] = os.path.expanduser(slideshow['folder'])
+
         if 'network' in config and 'home_assistant' in config['network']:
             ha = config['network']['home_assistant']
             if 'token_file' in ha:
@@ -92,6 +100,38 @@ class Config:
                 data[key] = {}
             data = data[key]
         data[keys[-1]] = value
+
+    def photo_source_paths(self) -> list[str]:
+        """Return the configured default and special photo directories."""
+        paths = [self.get('network', 'photo_source_path')]
+        special_slideshows = self.get('photos', 'special_slideshows', default=[])
+        if isinstance(special_slideshows, list):
+            paths.extend(
+                slideshow.get('folder')
+                for slideshow in special_slideshows
+                if isinstance(slideshow, dict)
+            )
+        return [
+            os.path.abspath(os.path.expanduser(path))
+            for path in paths
+            if isinstance(path, str) and path.strip()
+        ]
+
+    def photo_server_root(self) -> str:
+        """Return the narrowest common directory used to serve configured photos."""
+        paths = self.photo_source_paths()
+        if not paths:
+            raise ValueError("No photo source folders are configured")
+        return os.path.commonpath(paths)
+
+    def static_dir(self) -> str:
+        """Return the directory served by the slideshow's static HTTP server."""
+        slideshow_html = self.get('paths', 'slideshow_html')
+        if isinstance(slideshow_html, str) and slideshow_html:
+            return os.path.dirname(os.path.abspath(os.path.expanduser(slideshow_html)))
+        return os.path.expanduser(
+            self.get('paths', 'static_dir', default='~/kiosk-screensaver/static')
+        )
 
     def save(self) -> None:
         """Save current configuration to file."""
@@ -190,6 +230,48 @@ class Config:
             errors.append("photos.max_size_mb must be positive")
         if not photos.get('extensions'):
             errors.append("photos.extensions cannot be empty")
+
+        special_slideshows = photos.get('special_slideshows', [])
+        if not isinstance(special_slideshows, list):
+            errors.append("photos.special_slideshows must be a list")
+        else:
+            seen_dates = set()
+            valid_folders = []
+            for index, slideshow in enumerate(special_slideshows):
+                prefix = f"photos.special_slideshows[{index}]"
+                if not isinstance(slideshow, dict):
+                    errors.append(f"{prefix} must contain a date and folder")
+                    continue
+
+                special_date = slideshow.get('date')
+                if not isinstance(special_date, str) or not re.fullmatch(r"\d{2}-\d{2}", special_date):
+                    errors.append(f"{prefix}.date must use MM-DD format")
+                else:
+                    try:
+                        datetime.strptime(f"2000-{special_date}", "%Y-%m-%d")
+                    except ValueError:
+                        errors.append(f"{prefix}.date must be a valid calendar date")
+                    if special_date in seen_dates:
+                        errors.append(f"{prefix}.date duplicates another special slideshow")
+                    seen_dates.add(special_date)
+
+                folder = slideshow.get('folder')
+                if not isinstance(folder, str) or not folder.strip():
+                    errors.append(f"{prefix}.folder must be a non-empty path")
+                else:
+                    valid_folders.append(os.path.abspath(os.path.expanduser(folder)))
+
+            default_folder = network.get('photo_source_path')
+            if valid_folders and isinstance(default_folder, str) and default_folder.strip():
+                try:
+                    shared_root = os.path.commonpath([
+                        os.path.abspath(os.path.expanduser(default_folder)),
+                        *valid_folders,
+                    ])
+                    if shared_root == os.path.abspath(os.sep):
+                        errors.append("Photo folders must share a parent below the filesystem root")
+                except ValueError:
+                    errors.append("Photo folders must share a common parent directory")
 
         return errors
 

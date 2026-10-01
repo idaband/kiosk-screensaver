@@ -1,5 +1,6 @@
 """Flask web admin panel."""
 import json
+import copy
 import logging
 import os
 import subprocess
@@ -160,20 +161,29 @@ def create_app(config_path=None):
                     return jsonify({'error': f'Failed to save token: {e}'}), 500
 
             # Update config
+            candidate_data = copy.deepcopy(config.data)
             for section, values in updates.items():
                 if isinstance(values, dict):
                     for key, value in values.items():
-                        config.set(section, key, value=value)
+                        candidate_data.setdefault(section, {})[key] = value
                 else:
-                    config.data[section] = values
+                    candidate_data[section] = values
 
             # Validate
-            errors = config.validate()
+            candidate_config = copy.copy(config)
+            candidate_config.data = candidate_data
+            errors = candidate_config.validate()
             if errors:
                 return jsonify({'error': 'Validation failed', 'details': errors}), 400
 
             # Save
-            config.save()
+            previous_data = config.data
+            config.data = candidate_data
+            try:
+                config.save()
+            except Exception:
+                config.data = previous_data
+                raise
 
             # Update scheduled reboot cron if config changed
             if 'features' in updates and 'scheduled_reboot' in updates['features']:
@@ -212,12 +222,7 @@ def create_app(config_path=None):
 
             # Write slideshow config for static HTTP server
             try:
-                config_path = config.config_path
-                if config_path:
-                    config_dir = os.path.dirname(os.path.abspath(config_path))
-                    static_dir = os.path.join(config_dir, 'static')
-                else:
-                    static_dir = os.path.expanduser('~/kiosk-screensaver/static')
+                static_dir = config.static_dir()
 
                 slideshow_config = {
                     'slideshow_interval': config.get('timing', 'slideshow_interval', default=300)
