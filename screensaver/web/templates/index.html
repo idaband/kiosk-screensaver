@@ -371,6 +371,11 @@
         </div>
         <div class="grid">
             <div class="form-group">
+                <label for="dashboardScale">Dashboard Scale</label>
+                <input type="number" id="dashboardScale" min="0.75" max="2" step="0.05">
+                <div class="help-text">CSS scale factor for the kiosk dashboard</div>
+            </div>
+            <div class="form-group">
                 <label for="dimmedBrightness">Dimmed Brightness (0-100)</label>
                 <input type="number" id="dimmedBrightness" min="0" max="100">
                 <div class="help-text">Screen brightness during slideshow</div>
@@ -510,6 +515,7 @@
 
                 // Display
                 document.getElementById('dashboardUrl').value = config.display.dashboard_url || '';
+                document.getElementById('dashboardScale').value = config.display.dashboard_scale ?? 1.0;
                 document.getElementById('dimmedBrightness').value = config.display.dimmed_brightness;
                 document.getElementById('normalBrightness').value = config.display.normal_brightness;
 
@@ -628,6 +634,12 @@
 
         async function saveConfig() {
             try {
+                const dashboardScale = parseFloat(document.getElementById('dashboardScale').value);
+                if (!Number.isFinite(dashboardScale) || dashboardScale < 0.75 || dashboardScale > 2.0) {
+                    showMessage('Error: Dashboard Scale must be between 0.75 and 2.0.', 'error');
+                    return;
+                }
+
                 // Validate idle timeout
                 const idleTimeout = parseInt(document.getElementById('idleTimeout').value);
                 if (idleTimeout < 15) {
@@ -688,6 +700,7 @@
                     },
                     display: {
                         dashboard_url: document.getElementById('dashboardUrl').value,
+                        dashboard_scale: dashboardScale,
                         dimmed_brightness: parseInt(document.getElementById('dimmedBrightness').value),
                         normal_brightness: parseInt(document.getElementById('normalBrightness').value),
                         night_mode_monitor_off: document.getElementById('nightMonitorOff').checked
