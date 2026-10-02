@@ -413,6 +413,10 @@ echo "Configuring touchscreen for multi-touch mode..."
 
 AUTOSTART_DIR="$USER_HOME/.config/labwc"
 AUTOSTART_FILE="$AUTOSTART_DIR/autostart"
+WEB_ADMIN_PORT=$(awk '$1 == "web_admin_port:" {print $2; exit}' "$CONFIG_FILE")
+WEB_ADMIN_PORT=${WEB_ADMIN_PORT:-5000}
+DASHBOARD_WRAPPER_URL="http://127.0.0.1:${WEB_ADMIN_PORT}/dashboard"
+DASHBOARD_URL_SHELL=$(printf '%q' "$DASHBOARD_URL")
 
 # Create labwc config directory if it doesn't exist
 mkdir -p "$AUTOSTART_DIR"
@@ -447,25 +451,23 @@ export LIBVA_DRIVER_NAME=v3d_video
 unclutter -idle 2 -root &
 
 # Home Assistant Dashboard (Chromium Kiosk Mode)
-chromium \
-  --ozone-platform=wayland \
-  --touch-events=enabled \
-  --force-device-scale-factor=1.5 \
-  --default-zoom-level=1.5 \
-  --kiosk \
-  --noerrdialogs \
-  --disable-infobars \
-  --no-first-run \
-  --check-for-update-interval=31536000 \
-  --password-store=basic \
-  --disable-features=WakeLockSensor,IdleDetection,MediaSession \
-  --use-gl=egl \
-  --enable-features=VaapiVideoDecoder,VaapiVideoEncoder \
-  --ignore-gpu-blocklist \
-  --enable-gpu-rasterization \
-  --enable-zero-copy \
-  --ignore-certificate-errors \
-  "$DASHBOARD_URL" &
+# Wait for the boot-enabled web service before opening the local dashboard wrapper.
+DASHBOARD_PAGE_URL=$DASHBOARD_URL_SHELL
+dashboard_attempts=0
+while ! python3 -c "from urllib.request import urlopen; urlopen('http://127.0.0.1:${WEB_ADMIN_PORT}/api/dashboard-settings', timeout=1)" >/dev/null 2>&1; do
+    dashboard_attempts=$((dashboard_attempts + 1))
+    if [ "$dashboard_attempts" -ge 30 ]; then
+        echo "Dashboard wrapper unavailable; opening the dashboard URL directly" >> "$USER_HOME/screensaver-startup.log"
+        break
+    fi
+    sleep 1
+done
+if [ "$dashboard_attempts" -lt 30 ]; then
+    DASHBOARD_PAGE_URL="$DASHBOARD_WRAPPER_URL"
+fi
+
+# Kiosk Dashboard (Chromium Kiosk Mode)
+chromium --kiosk --noerrdialogs --disable-infobars --no-first-run --check-for-update-interval=31536000 --password-store=basic --disable-features=WakeLockSensor,IdleDetection,MediaSession --use-gl=egl --enable-features=VaapiVideoDecoder,VaapiVideoEncoder --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy --ignore-certificate-errors "$DASHBOARD_PAGE_URL" &
 
 # Kiosk Screensaver (Python version) - log startup to file for debugging
 cd $INSTALL_DIR && PYTHONPATH=$INSTALL_DIR python3 -m screensaver.main -c $INSTALL_DIR/config.yaml >> $USER_HOME/screensaver-startup.log 2>&1 &

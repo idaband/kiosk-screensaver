@@ -1,11 +1,13 @@
 """Configuration management for kiosk screensaver."""
 import os
 import re
+import math
 import yaml
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
+from urllib.parse import urlparse
 
 class Config:
     """Manages configuration loading and validation."""
@@ -219,6 +221,34 @@ class Config:
 
         # Validate display brightness
         display = self.data.get('display', {})
+        dashboard_url = display.get('dashboard_url', '')
+        if dashboard_url:
+            if not isinstance(dashboard_url, str):
+                errors.append("display.dashboard_url must be an HTTP or HTTPS URL")
+            else:
+                parsed_url = urlparse(dashboard_url)
+                try:
+                    parsed_url.port
+                except ValueError:
+                    errors.append("display.dashboard_url must be an HTTP or HTTPS URL")
+                if (
+                    parsed_url.scheme not in ('http', 'https')
+                    or not parsed_url.hostname
+                    or parsed_url.username is not None
+                    or parsed_url.password is not None
+                    or any(ord(character) < 32 for character in dashboard_url)
+                ):
+                    errors.append("display.dashboard_url must be an HTTP or HTTPS URL")
+
+        dashboard_scale = display.get('dashboard_scale', 1.0)
+        if (
+            isinstance(dashboard_scale, bool)
+            or not isinstance(dashboard_scale, (int, float))
+            or not math.isfinite(dashboard_scale)
+            or not 0.75 <= dashboard_scale <= 2.0
+        ):
+            errors.append("display.dashboard_scale must be a number from 0.75 to 2.0")
+
         for brightness_key in ['dimmed_brightness', 'normal_brightness']:
             brightness = display.get(brightness_key, -1)
             if not (0 <= brightness <= 100):

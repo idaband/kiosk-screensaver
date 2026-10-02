@@ -58,6 +58,8 @@ display:
 
   # Main kiosk dashboard URL (must include http://)
   dashboard_url: __DASHBOARD_URL__
+  # CSS scale factor for the local dashboard wrapper (0.75-2.0)
+  dashboard_scale: 1.0
 
   # Monitor power management
   night_mode_monitor_off: true

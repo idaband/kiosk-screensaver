@@ -1,10 +1,12 @@
 """Flask web admin panel."""
 import json
 import copy
+import ipaddress
 import logging
 import os
 import subprocess
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from urllib.parse import urlparse
+from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
 from functools import wraps
 
 from screensaver.config import load_config
@@ -117,6 +119,12 @@ def create_app(config_path=None):
             return f(*args, **kwargs)
         return decorated
 
+    def is_loopback_request():
+        try:
+            return ipaddress.ip_address(request.remote_addr).is_loopback
+        except (TypeError, ValueError):
+            return False
+
     @app.route('/')
     @requires_auth
     def index():
@@ -135,6 +143,62 @@ def create_app(config_path=None):
         return jsonify({
             'slideshow_interval': config.get('timing', 'slideshow_interval', default=300)
         })
+
+    @app.route('/dashboard')
+    def dashboard():
+        """Render the local scaled dashboard wrapper for the kiosk browser."""
+        if not is_loopback_request():
+            return 'Forbidden', 403
+
+        dashboard_url = config.get('display', 'dashboard_url', default='')
+        parsed_url = urlparse(dashboard_url)
+        try:
+            dashboard_port = parsed_url.port
+        except ValueError:
+            return 'A valid HTTP or HTTPS dashboard URL is required', 400
+        if (
+            parsed_url.scheme not in ('http', 'https')
+            or not parsed_url.hostname
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or any(ord(character) < 32 for character in dashboard_url)
+        ):
+            return 'A valid HTTP or HTTPS dashboard URL is required', 400
+
+        dashboard_host = parsed_url.hostname
+        if ':' in dashboard_host:
+            dashboard_host = f'[{dashboard_host}]'
+        default_port = 80 if parsed_url.scheme == 'http' else 443
+        port_suffix = f':{dashboard_port}' if dashboard_port and dashboard_port != default_port else ''
+        dashboard_origin = f'{parsed_url.scheme}://{dashboard_host}{port_suffix}'
+
+        response = make_response(render_template(
+            'dashboard.html',
+            dashboard_url=dashboard_url,
+            dashboard_scale=config.get('display', 'dashboard_scale', default=1.0),
+            dashboard_origin=dashboard_origin,
+        ))
+        response.headers['Cache-Control'] = 'no-store'
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; connect-src 'self'; "
+            f"frame-src {dashboard_origin}; "
+            "frame-ancestors 'self'; object-src 'none'; base-uri 'none'"
+        )
+        return response
+
+    @app.route('/api/dashboard-settings')
+    def get_dashboard_settings():
+        """Expose only dashboard settings to the local kiosk wrapper."""
+        if not is_loopback_request():
+            return jsonify({'error': 'Forbidden'}), 403
+
+        response = make_response(jsonify({
+            'dashboard_url': config.get('display', 'dashboard_url', default=''),
+            'dashboard_scale': config.get('display', 'dashboard_scale', default=1.0),
+        }))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
 
     @app.route('/api/config', methods=['POST'])
     @requires_auth
@@ -196,29 +260,6 @@ def create_app(config_path=None):
                 )
                 if not success:
                     logger.warning(f"Failed to update reboot cron: {message}")
-
-            # Update labwc autostart if dashboard URL changed
-            if 'display' in updates and 'dashboard_url' in updates['display']:
-                new_url = updates['display']['dashboard_url'].strip()
-                autostart_file = os.path.expanduser('~/.config/labwc/autostart')
-                if os.path.exists(autostart_file):
-                    try:
-                        with open(autostart_file, 'r') as f:
-                            content = f.read()
-
-                        # Replace the dashboard URL in the chromium command
-                        # Pattern matches any URL (valid or malformed) after --ignore-certificate-errors
-                        import re
-                        pattern = r'(chromium.*--ignore-certificate-errors\s+)([^\s&]+)(\s+&)'
-                        replacement = r'\1' + new_url + r'\3'
-                        new_content = re.sub(pattern, replacement, content)
-
-                        with open(autostart_file, 'w') as f:
-                            f.write(new_content)
-
-                        logger.info(f"Updated dashboard URL in autostart to: {new_url}")
-                    except Exception as e:
-                        logger.error(f"Failed to update autostart file: {e}")
 
             # Write slideshow config for static HTTP server
             try:
@@ -431,6 +472,9 @@ def run_web_admin(config_path=None, host='0.0.0.0', port=5000):
         port: Port to listen on
     """
     app = create_app(config_path)
+    config = app.config['SCREENSAVER_CONFIG']
+    host = config.get('network', 'web_admin_host', default=host)
+    port = config.get('network', 'web_admin_port', default=port)
     logger.info(f"Starting web admin on {host}:{port}")
     app.run(host=host, port=port, debug=False)
 

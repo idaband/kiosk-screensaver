@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiosk Dashboard</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body, #dashboard-viewport { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #000; }
+        #dashboard-frame { position: absolute; top: 0; left: 0; display: block; border: 0; transform-origin: top left; }
+    </style>
+</head>
+<body>
+    <main id="dashboard-viewport">
+        <iframe id="dashboard-frame" title="Dashboard" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </main>
+    <script>
+        const frame = document.getElementById('dashboard-frame');
+        const allowedOrigin = {{ dashboard_origin | tojson }};
+        let currentUrl = '';
+        let currentScale = 0;
+
+        function applySettings(settings) {
+            const dashboardUrl = new URL(settings.dashboard_url);
+            if (!['http:', 'https:'].includes(dashboardUrl.protocol)) return;
+            if (dashboardUrl.origin !== allowedOrigin) {
+                window.location.reload();
+                return;
+            }
+
+            const scale = Number(settings.dashboard_scale);
+            if (!Number.isFinite(scale) || scale < 0.75 || scale > 2) return;
+
+            if (dashboardUrl.href !== currentUrl) {
+                currentUrl = dashboardUrl.href;
+                frame.src = currentUrl;
+            }
+
+            if (scale !== currentScale) {
+                currentScale = scale;
+                frame.style.width = `${100 / scale}vw`;
+                frame.style.height = `${100 / scale}vh`;
+                frame.style.transform = `scale(${scale})`;
+            }
+        }
+
+        async function refreshSettings() {
+            try {
+                const response = await fetch('/api/dashboard-settings', {cache: 'no-store'});
+                if (!response.ok) throw new Error(`Settings request failed: ${response.status}`);
+                applySettings(await response.json());
+            } catch (error) {
+                console.error('Failed to update dashboard settings:', error);
+            }
+        }
+
+        applySettings({
+            dashboard_url: {{ dashboard_url | tojson }},
+            dashboard_scale: {{ dashboard_scale | tojson }}
+        });
+        refreshSettings();
+        setInterval(refreshSettings, 5000);
+    </script>
+</body>
+</html>
