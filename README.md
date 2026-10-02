@@ -34,7 +34,7 @@ Perfect for creating a wall-mounted Home Assistant dashboard that automatically 
 
 ### Software
 - **Fresh Raspberry Pi OS (64-bit)** - Debian Trixie or newer
-- **Desktop mode with auto-login** initially configured (installer will switch to CLI)
+- **Desktop mode with auto-login** initially configured (the standard installer switches to CLI; the desktop alternative preserves it)
 - Internet connection for downloading dependencies
 
 ## Installation
@@ -108,6 +108,24 @@ After reboot:
 - labwc Wayland compositor starts automatically
 - Chromium opens your dashboard in kiosk mode
 - Screensaver runs in the background
+
+### Desktop Mode Install (Wayland/labwc)
+
+Use this alternative if you want to keep Raspberry Pi OS Desktop enabled. It does not switch the boot target, start another compositor, or change firmware/touch rotation. The dashboard remains fullscreen above the desktop, with the screensaver overlaying it while idle.
+
+1. Boot into the labwc Wayland desktop and keep the desktop user logged in.
+2. Transfer this project to the Pi and open a terminal as the desktop user.
+3. If the existing labwc autostart still contains active Chromium kiosk or `screensaver.main` launch commands, back up the file and comment those commands out first. The desktop installer stops if it detects them, to avoid duplicate instances.
+4. Run the desktop installer as the regular user, not with `sudo`:
+
+   ```bash
+   cd ~/kiosk-screensaver
+   bash install-desktop.sh
+   ```
+
+5. Restart the labwc desktop session or reboot. The installer adds managed autostart/shutdown blocks and session-scoped user services; it preserves unrelated labwc entries and an existing `config.yaml`.
+
+If the installer adds the user to the `input` or `i2c` group, log out and back in before testing. To remove only this desktop integration while preserving the shared web service and config, run `bash uninstall-desktop.sh` as the desktop user.
 
 ## Configuration
 

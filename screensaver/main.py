@@ -54,7 +54,7 @@ def setup_logging(config):
     return logger
 
 
-def validate_environment():
+def validate_environment(config=None):
     """Validate required environment and permissions."""
     errors = []
 
@@ -62,8 +62,10 @@ def validate_environment():
     if not os.environ.get('WAYLAND_DISPLAY'):
         errors.append("WAYLAND_DISPLAY not set. Must run in Wayland session.")
 
-    # Check for required commands
-    required_commands = ['chromium', 'ddcutil', 'wlopm', 'rclone', 'pgrep', 'pkill']
+    # Monitor power control is only required when night mode powers the output off.
+    required_commands = ['chromium', 'ddcutil', 'rclone', 'pgrep', 'pkill']
+    if config is None or config.get('display', 'night_mode_monitor_off', default=True):
+        required_commands.append('wlopm')
     for cmd in required_commands:
         if os.system(f'which {cmd} > /dev/null 2>&1') != 0:
             errors.append(f"Required command not found: {cmd}")
@@ -122,7 +124,7 @@ def main():
                 sys.exit(0)
 
         # Validate environment
-        env_errors = validate_environment()
+        env_errors = validate_environment(config)
         if env_errors:
             logger.error("Environment validation failed:")
             for error in env_errors:

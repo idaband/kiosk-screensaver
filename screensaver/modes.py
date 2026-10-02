@@ -178,7 +178,9 @@ class ModeHandler:
 
             # Set environment variables
             env = os.environ.copy()
-            env['WAYLAND_DISPLAY'] = self.config.get('environment', 'wayland_display', default='wayland-0')
+            env['WAYLAND_DISPLAY'] = os.environ.get('WAYLAND_DISPLAY') or self.config.get(
+                'environment', 'wayland_display', default='wayland-0'
+            )
             env['LIBVA_DRIVER_NAME'] = self.config.get('environment', 'libva_driver', default='v3d_video')
 
             self.chromium_process = subprocess.Popen(
@@ -260,7 +262,9 @@ class ModeHandler:
             logger.info(f"Launching blank screen: {' '.join(cmd)}")
 
             env = os.environ.copy()
-            env['WAYLAND_DISPLAY'] = self.config.get('environment', 'wayland_display', default='wayland-0')
+            env['WAYLAND_DISPLAY'] = os.environ.get('WAYLAND_DISPLAY') or self.config.get(
+                'environment', 'wayland_display', default='wayland-0'
+            )
 
             self.chromium_process = subprocess.Popen(
                 cmd,
